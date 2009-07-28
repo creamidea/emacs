@@ -488,6 +488,7 @@ Lisp_Object Qsave_session;
 #ifdef HAVE_DBUS
 Lisp_Object Qdbus_event;
 #endif
+Lisp_Object Qxwidget_event;
 /* Lisp_Object Qmouse_movement; - also an event header */
 
 /* Properties of event headers.  */
@@ -4278,6 +4279,11 @@ kbd_buffer_get_event (kbp, used_mouse_menu, end_time)
 	  kbd_fetch_ptr = event + 1;
 	}
 #endif
+      else if (event->kind == XWIDGET_EVENT)
+	{
+	  obj = make_lispy_event (event);
+	  kbd_fetch_ptr = event + 1;
+	}
       else
 	{
 	  /* If this event is on a different frame, return a switch-frame this
@@ -6144,6 +6150,8 @@ make_lispy_event (event)
 	return apply_modifiers (event->modifiers, event->arg);
       return event->arg;
 
+
+      
     case USER_SIGNAL_EVENT:
       /* A user signal.  */
       {
@@ -6162,7 +6170,11 @@ make_lispy_event (event)
 	return Fcons (Qdbus_event, event->arg);
       }
 #endif /* HAVE_DBUS */
-
+    case XWIDGET_EVENT:
+      {
+        printf("cool, an xwidget event arrived in make_lispy_event!\n");
+        return  Fcons (Qxwidget_event,event->arg);
+      }
 #ifdef HAVE_GPM
     case GPM_CLICK_EVENT:
       {
@@ -11866,6 +11878,10 @@ syms_of_keyboard ()
   staticpro (&Qdbus_event);
 #endif
 
+  Qxwidget_event = intern ("xwidget-event");
+  staticpro (&Qxwidget_event);
+
+  
   Qmenu_enable = intern ("menu-enable");
   staticpro (&Qmenu_enable);
   Qmenu_alias = intern ("menu-alias");

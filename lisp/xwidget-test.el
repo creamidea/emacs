@@ -76,12 +76,12 @@
             (let*
                 ((xembed-id (nth 3 last-input-event)))
               (message "xembed ready  %S" xembed-id)
-              ;;will start emacs in a xembed socket when its ready
+              ;;will start emacs/uzbl in a xembed socket when its ready
               (cond
                ((eq 3 xwidget-id)
                 (start-process "xembed" "*xembed*" (format "%ssrc/emacs" default-directory) "-q" "--parent-id" (number-to-string xembed-id) ) )
-;               ((eq 5 xwidget-id)
-;                (start-process "xembed2" "*xembed2*" "surf"  "--parent-id" (number-to-string xembed-id) ) )
+               ((eq 5 xwidget-id)
+                (start-process "xembed2" "*xembed2*" "/mnt/data/build/uzbl/uzbl"  "-s" (number-to-string xembed-id)  "http://www.fsf.org" )  )
                
               )
             )))))

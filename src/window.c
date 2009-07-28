@@ -50,6 +50,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "nsterm.h"
 #endif
 
+#include "xwidget.h"
 
 Lisp_Object Qwindowp, Qwindow_live_p, Qwindow_configuration_p;
 Lisp_Object Qdisplay_buffer;
@@ -3653,6 +3654,7 @@ selected window before each command.  */)
       SET_PT (new_point);
   }
 
+  xwidget_invalidate();
   windows_or_buffers_changed++;
   return window;
 }
