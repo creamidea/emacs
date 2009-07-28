@@ -70,6 +70,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 #include "coding.h"
 #include "frame.h"
 #include "dispextern.h"
+#include "xwidget.h"
 #include "fontset.h"
 #include "termhooks.h"
 #include "termopts.h"
@@ -2413,7 +2414,7 @@ x_draw_image_foreground_1 (s, pixmap)
 /* Draw part of the background of glyph string S.  X, Y, W, and H
    give the rectangle to draw.  */
 
-static void
+ void
 x_draw_glyph_string_bg_rect (s, x, y, w, h)
      struct glyph_string *s;
      int x, y, w, h;
@@ -2639,6 +2640,7 @@ x_draw_glyph_string (s)
 {
   int relief_drawn_p = 0;
 
+  printf("x_draw_glyph_string: %d\n",s->first_glyph->type);
   /* If S draws into the background of its successors, draw the
      background of the successors first so that S can draw into it.
      This makes S->next use XDrawString instead of XDrawImageString.  */
@@ -2694,6 +2696,11 @@ x_draw_glyph_string (s)
     {
     case IMAGE_GLYPH:
       x_draw_image_glyph_string (s);
+      break;
+
+    case XWIDGET_GLYPH:
+      x_draw_glyph_string_background (s, 0);
+      x_draw_xwidget_glyph_string (s);
       break;
 
     case STRETCH_GLYPH:
@@ -6301,7 +6308,9 @@ handle_one_xevent (dpyinfo, eventp, finish, hold_quit)
              tool bar in GTK 2.4.  Keys will still go to menus and
              dialogs because in that case popup_activated is TRUE
              (see above).  */
-          *finish = X_EVENT_DROP;
+          if(!xwidget_owns_kbd)
+            *finish = X_EVENT_DROP;
+          //FIXME for xwidget, the above line should be disabled when the child has focus
 #endif
 
           event.xkey.state

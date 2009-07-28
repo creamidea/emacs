@@ -4019,6 +4019,7 @@ update_single_window (w, force_p)
 {
   if (w->must_be_updated_p)
     {
+      printf("window %d must be updated\n");
       struct frame *f = XFRAME (WINDOW_FRAME (w));
 
       /* Record that this is not a frame-based redisplay.  */
@@ -4380,6 +4381,9 @@ update_window (w, force_p)
   /* check_current_matrix_flags (w); */
   add_window_display_history (w, w->current_matrix->method, paused_p);
 #endif
+
+  if ((XWINDOW(FRAME_SELECTED_WINDOW (SELECTED_FRAME()))) ==  (w))
+    xwidget_end_redisplay(w->current_matrix);
 
   clear_glyph_matrix (desired_matrix);
 
