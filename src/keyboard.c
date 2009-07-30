@@ -6151,7 +6151,6 @@ make_lispy_event (event)
       return event->arg;
 
 
-
     case USER_SIGNAL_EVENT:
       /* A user signal.  */
       {

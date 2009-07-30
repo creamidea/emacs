@@ -4372,9 +4372,7 @@ handle_single_display_spec (it, spec, object, overlay, position,
          (CONSP (value) && EQ (XCAR (value), Qspace)),
          display_replaced_before_p,
          STRINGP (value));
-
   valid_p = (STRINGP (value)
-
 #ifdef HAVE_WINDOW_SYSTEM
              || (FRAME_WINDOW_P (it->f) && valid_image_p (value))
 #endif /* not HAVE_WINDOW_SYSTEM */
@@ -5141,7 +5139,6 @@ push_it (it)
     case GET_FROM_XWIDGET:
       p->u.xwidget.object = it->object;
       break;
-
     }
   p->position = it->position;
   p->current = it->current;
@@ -11370,7 +11367,6 @@ redisplay_internal (preserve_echo_area)
 
   printf(">>>>redisplay\n");
   //  xwidget_start_redisplay();
-
   TRACE ((stderr, "redisplay_internal %d\n", redisplaying_p));
 
   /* No redisplay if running in batch mode or frame is not yet fully
@@ -12091,7 +12087,6 @@ redisplay_internal (preserve_echo_area)
   unbind_to (count, Qnil);
   RESUME_POLLING;
   //xwidget_end_redisplay();
-
   printf("<<<<redisplay\n");
 }
 
@@ -15711,7 +15706,6 @@ dump_glyph (row, glyph, area)
 	       glyph->face_id,
 	       glyph->left_box_line_p,
 	       glyph->right_box_line_p);
-
       //      printf("dump xwidget glyph\n");
     }
 }
@@ -20917,7 +20911,6 @@ produce_xwidget_glyph (it)
   PREPARE_FACE_FOR_DISPLAY (it->f, face);
 
   /////////////////////////////////////////////
-
   //  img = IMAGE_FROM_ID (it->f, it->image_id);
   //xassert (img);
   /* Make sure X resources of the image is loaded.  */
@@ -20925,7 +20918,6 @@ produce_xwidget_glyph (it)
 
   struct xwidget* xw=xwidget_from_id(it->xwidget_id);
   //xwidget_touch(xw);
-
   it->ascent = it->phys_ascent = glyph_ascent = xw->height/2;//image_ascent (img, face, &slice);
   it->descent = xw->height/2;//slice.height - glyph_ascent;
 
@@ -20939,7 +20931,6 @@ produce_xwidget_glyph (it)
   //it->pixel_width += img->hmargin;
 
   /////////////////////////////////////////
-
   /* It's quite possible for images to have an ascent greater than
      their height, so don't get confused in that case.  */
   if (it->descent < 0)
@@ -20986,7 +20977,6 @@ produce_xwidget_glyph (it)
 	  glyph->voffset = it->voffset;
           //	  glyph->type = IMAGE_GLYPH;
 	  glyph->type = XWIDGET_GLYPH;
-
 	  glyph->multibyte_p = it->multibyte_p;
 	  glyph->left_box_line_p = it->start_of_box_run_p;
 	  glyph->right_box_line_p = it->end_of_box_run_p;

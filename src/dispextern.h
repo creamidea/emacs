@@ -2150,7 +2150,6 @@ struct it
   /* If what == IT_XWIDGET*/
   int xwidget_id;
 
-
   /* Values from `slice' property.  */
   struct it_slice slice;
 

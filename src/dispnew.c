@@ -4384,7 +4384,6 @@ update_window (w, force_p)
 
   if ((XWINDOW(FRAME_SELECTED_WINDOW (SELECTED_FRAME()))) ==  (w))
     xwidget_end_redisplay(w->current_matrix);
-
   clear_glyph_matrix (desired_matrix);
 
   return paused_p;
