@@ -194,6 +194,10 @@ void x_draw_xwidget_glyph_string (s)
     //    g_assert(parent);
         //        xw->widgetwindow = GTK_WINDOW(gtk_window_new (GTK_WINDOW_POPUP));//GTK_WINDOW_TOPLEVEL)); //GTK_WINDOW_POPUP somehow works better than GTK_TOPLEVEL
     //    gtk_widget_set_size_request ( xw->widget ,s->background_width,s->height);
+
+    //TODO mk container widget 1st, and put the widget inside
+    //later, drawing should crop container window if necessary to handle case where xwidget is near bottom of emacs window
+    
     gtk_widget_set_size_request (xw->widget ,xw->width,xw->height);    
     gtk_fixed_put(GTK_FIXED(s->f->gwfixed),xw->widget ,x,y);
     gtk_widget_show_all (xw->widget );
@@ -240,6 +244,7 @@ void x_draw_xwidget_glyph_string (s)
     XGCValues xgcv;
     XGetGCValues (s->display, s->gc, GCForeground | GCBackground, &xgcv);
     XFillRectangle (s->display, s->window, s->gc, x, y, xw->width, xw->height);
+    //TODO write alternate text on top of rect here
   }
   xw->x=x;
   xw->y=y;
