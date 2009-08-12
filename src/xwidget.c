@@ -194,21 +194,22 @@ void x_draw_xwidget_glyph_string (s)
       gtk_scale_set_draw_value(GTK_SCALE(xw->widget),FALSE); //i think its emacs role to show text and stuff, so disable the widgets own text
       printf("mk hscale\n");
     }
-
-    //s->window   Window window; is an xwindows XID
-    //    parent=gdk_window_foreign_new (s->window);
-    //    g_assert(parent);
-    //        xw->widgetwindow = GTK_WINDOW(gtk_window_new (GTK_WINDOW_POPUP));//GTK_WINDOW_TOPLEVEL)); //GTK_WINDOW_POPUP somehow works better than GTK_TOPLEVEL
-    //    gtk_widget_set_size_request ( xw->widget ,s->background_width,s->height);
-
-    //TODO mk container widget 1st, and put the widget inside
+    // mk container widget 1st, and put the widget inside
     //later, drawing should crop container window if necessary to handle case where xwidget is near bottom of emacs window
-    xw->widgetwindow = GTK_SCROLLED_WINDOW(gtk_scrolled_window_new(NULL,NULL));
-    gtk_widget_set_size_request (GTK_WIDGET(xw->widgetwindow) ,xw->width,xw->height);
-    gtk_scrolled_window_set_policy(xw->widgetwindow, GTK_POLICY_NEVER, GTK_POLICY_NEVER);
-    gtk_container_add(GTK_CONTAINER(xw->widgetwindow), xw->widget);
+    //TODO use gtk_fixed rather than scrolled window
+    xw->widgetwindow = GTK_CONTAINER(gtk_layout_new(NULL,NULL));
+    //    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(xw->widgetwindow), GTK_POLICY_NEVER, GTK_POLICY_NEVER);
+    //   GtkContainer* gtkfixed=GTK_CONTAINER (gtk_fixed_new());
     
-    gtk_widget_set_size_request (xw->widget ,xw->width,xw->height);    
+    //gtk_container_add(xw->widgetwindow,  GTK_WIDGET(gtkfixed));
+    
+    gtk_layout_set_size (GTK_LAYOUT(xw->widgetwindow) ,xw->width,xw->height);
+    
+    //gtk_container_add(gtkfixed, xw->widget);
+    gtk_container_add(xw->widgetwindow, xw->widget);
+    
+    //gtk_widget_set_size_request (xw->widget ,xw->width,xw->height);
+    gtk_widget_set_size_request(GTK_WIDGET(xw->widget) ,xw->width,xw->height);
     gtk_fixed_put(GTK_FIXED(s->f->gwfixed),GTK_WIDGET(xw->widgetwindow) ,x,y);
     gtk_widget_show_all (GTK_WIDGET(xw->widgetwindow) );
 
@@ -223,8 +224,6 @@ void x_draw_xwidget_glyph_string (s)
   // the area before or after move?
   //or maybe emacs would handle erase better if i somehow communicated widget size better to emacs
 
-  //x_draw_glyph_string_bg_rect (s, x, y, s->background_width, xw->height); //erase bg
-
   //ok, we are painting the xwidgets in non-selected window
   //we cant get real widgets here, so we draw a simple rectangle instead(for now)
   XGCValues xgcv;
@@ -234,27 +233,19 @@ void x_draw_xwidget_glyph_string (s)
   XSetForeground (s->display, s->gc, xgcv.foreground);
   
   if(drawing_in_selected_window){
-    if(//drawing_in_selected_window && //only move the widget in selected window
-       ( xw->x != x || xw->y != y)) //has it moved?
+    if(xw->x != x || xw->y != y) //has it moved?
       {
         printf("xwidget %d moved\n",xw->id);
-        //      gtk_widget_hide(xw->widget);
-        //gdk_window_clear (      xw->widget);
-        gtk_fixed_move(GTK_FIXED(s->f->gwfixed),xw->widgetwindow ,x,y);
-        //      gtk_widget_show(xw->widget);
-
-
-        
       }
     else
       {
-        gtk_fixed_move(GTK_FIXED(s->f->gwfixed),xw->widgetwindow ,x,y);
       }
+    gtk_fixed_move(GTK_FIXED(s->f->gwfixed),GTK_WIDGET(xw->widgetwindow) ,x,y);    
     //adjust size of the widget window if some parts happen to be outside drawable area
     //that is, we should clip
     //an emacs window is not a gtk window, a gtk window covers the entire frame
-    int clipx=min(xw->width,WINDOW_RIGHT_EDGE_X((s->w))-x);
-    int clipy=min(xw->height,WINDOW_BOTTOM_EDGE_Y((s->w))-WINDOW_MODE_LINE_HEIGHT(s->w)-y);
+    int clipx=min(xw->width,WINDOW_RIGHT_EDGE_X(s->w)-x);
+    int clipy=min(xw->height,WINDOW_BOTTOM_EDGE_Y(s->w)-WINDOW_MODE_LINE_HEIGHT(s->w)-y);
     gtk_widget_set_size_request (GTK_WIDGET(xw->widgetwindow) , clipx,   clipy);
 
   }else{
