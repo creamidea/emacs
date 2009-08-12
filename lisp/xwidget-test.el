@@ -1,6 +1,6 @@
 ;;test like:
 ;; cd /path/to/xwidgets-emacs-dir
-;; make   all&&  src/emacs -q --eval "(load \"`pwd`/lisp/xwidget-test.el\")"
+;; make   all&&  src/emacs -q --eval "(progn (load \"`pwd`/lisp/xwidget-test.el\") (xwidget-demo-basic))"
 ;; m-x xwidget-demo-basic
 
 ;; you should see:
@@ -24,9 +24,11 @@
 
 ;;currently interface is lame:
 ;; :type 1=button, 2=toggle btn, 3=xembed socket(id will be printed to stdout)
+;; obviously these should be symbols
+
 ;; :xwidget-id 1, MUST be unique and < 100 !
 ;; if slightly wrong, emacs WILL CRASH
-;; obviously these should be symbols
+
 
 (defun xwidget-insert (where id type title width height)
   (goto-char where)
@@ -41,6 +43,14 @@
   (xwidget-insert          30 3 3 "3" 400 200)
   (xwidget-insert          20 4 4 "4" 100 50)
   (xwidget-insert          40 5 3 "5" 400 400)
+  (define-key (current-local-map) [xwidget-event] 'xwidget-handler-demo-basic)
+)
+
+
+(defun xwidget-demo-single ()
+  (interactive)
+  (insert "xwidgetdemo<<< a button. another button\n")
+  (xwidget-insert (point-min) 1 1 "1" 200 300)
   (define-key (current-local-map) [xwidget-event] 'xwidget-handler-demo-basic)
 )
 
