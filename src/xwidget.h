@@ -16,8 +16,8 @@ struct xwidget{
   int id;
   int type;
   GtkWidget* widget;
-         
-  //  GtkWindow* widgetwindow;
+  GtkScrolledWindow* widgetwindow;
+
   char* title;
   int initialized;
   int height;

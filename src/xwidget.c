@@ -135,8 +135,14 @@ static void send_xembed_ready_event(int xwid,int xembedid){
 /* xwidgets can only be "live" in exactly one window.
    that is, there is only ever 1 gtk widget belonging to a xwidget.
    then there might be phantom xwidgets, 
- */
+*/
 struct window* xwidget_live_window=0;
+
+void printnativerect(XRectangle rect){
+  printf("xwidget clip:%d %d %d %d\n ",
+         rect.x,rect.y,rect.width,rect.height);
+}
+
 
 void x_draw_xwidget_glyph_string (s)
      struct glyph_string *s;
@@ -192,11 +198,19 @@ void x_draw_xwidget_glyph_string (s)
     //s->window   Window window; is an xwindows XID
     //    parent=gdk_window_foreign_new (s->window);
     //    g_assert(parent);
-        //        xw->widgetwindow = GTK_WINDOW(gtk_window_new (GTK_WINDOW_POPUP));//GTK_WINDOW_TOPLEVEL)); //GTK_WINDOW_POPUP somehow works better than GTK_TOPLEVEL
+    //        xw->widgetwindow = GTK_WINDOW(gtk_window_new (GTK_WINDOW_POPUP));//GTK_WINDOW_TOPLEVEL)); //GTK_WINDOW_POPUP somehow works better than GTK_TOPLEVEL
     //    gtk_widget_set_size_request ( xw->widget ,s->background_width,s->height);
+
+    //TODO mk container widget 1st, and put the widget inside
+    //later, drawing should crop container window if necessary to handle case where xwidget is near bottom of emacs window
+    xw->widgetwindow = GTK_SCROLLED_WINDOW(gtk_scrolled_window_new(NULL,NULL));
+    gtk_widget_set_size_request (GTK_WIDGET(xw->widgetwindow) ,xw->width,xw->height);
+    gtk_scrolled_window_set_policy(xw->widgetwindow, GTK_POLICY_NEVER, GTK_POLICY_NEVER);
+    gtk_container_add(GTK_CONTAINER(xw->widgetwindow), xw->widget);
+    
     gtk_widget_set_size_request (xw->widget ,xw->width,xw->height);    
-    gtk_fixed_put(GTK_FIXED(s->f->gwfixed),xw->widget ,x,y);
-    gtk_widget_show_all (xw->widget );
+    gtk_fixed_put(GTK_FIXED(s->f->gwfixed),GTK_WIDGET(xw->widgetwindow) ,x,y);
+    gtk_widget_show_all (GTK_WIDGET(xw->widgetwindow) );
 
     if(doingsocket){
       printf("socket id:%x %d\n", gtk_socket_get_id (GTK_SOCKET(xw->widget)), gtk_socket_get_id (GTK_SOCKET(xw->widget)));
@@ -205,14 +219,14 @@ void x_draw_xwidget_glyph_string (s)
   }
 
 
-    //move doesnt seem to quite remove the previous drawing of the widget, so perhaps i should clear
+  //move doesnt seem to quite remove the previous drawing of the widget, so perhaps i should clear
   // the area before or after move?
   //or maybe emacs would handle erase better if i somehow communicated widget size better to emacs
 
   //x_draw_glyph_string_bg_rect (s, x, y, s->background_width, xw->height); //erase bg
 
-    //ok, we are painting the xwidgets in non-selected window
-    //we cant get real widgets here, so we draw a simple rectangle instead(for now)
+  //ok, we are painting the xwidgets in non-selected window
+  //we cant get real widgets here, so we draw a simple rectangle instead(for now)
   XGCValues xgcv;
   XGetGCValues (s->display, s->gc, GCForeground | GCBackground, &xgcv);
   XSetForeground (s->display, s->gc, xgcv.background);
@@ -226,26 +240,39 @@ void x_draw_xwidget_glyph_string (s)
         printf("xwidget %d moved\n",xw->id);
         //      gtk_widget_hide(xw->widget);
         //gdk_window_clear (      xw->widget);
-        gtk_fixed_move(GTK_FIXED(s->f->gwfixed),xw->widget ,x,y);
+        gtk_fixed_move(GTK_FIXED(s->f->gwfixed),xw->widgetwindow ,x,y);
         //      gtk_widget_show(xw->widget);
+
+
         
       }
     else
       {
-        gtk_fixed_move(GTK_FIXED(s->f->gwfixed),xw->widget ,x,y);
+        gtk_fixed_move(GTK_FIXED(s->f->gwfixed),xw->widgetwindow ,x,y);
       }
+    //adjust size of the widget window if some parts happen to be outside drawable area
+    //that is, we should clip
+    //an emacs window is not a gtk window, a gtk window covers the entire frame
+    int clipx=min(xw->width,WINDOW_RIGHT_EDGE_X((s->w))-x);
+    int clipy=min(xw->height,WINDOW_BOTTOM_EDGE_Y((s->w))-WINDOW_MODE_LINE_HEIGHT(s->w)-y);
+    gtk_widget_set_size_request (GTK_WIDGET(xw->widgetwindow) , clipx,   clipy);
+
   }else{
     //ok, we are painting the xwidgets in non-selected window
     //we cant get real widgets here, so we draw a simple rectangle instead(for now)
     XGCValues xgcv;
     XGetGCValues (s->display, s->gc, GCForeground | GCBackground, &xgcv);
     XFillRectangle (s->display, s->window, s->gc, x, y, xw->width, xw->height);
+    //TODO write alternate text on top of rect here
+    //TODO have a look at of-screen rendering of gtk widgets and use that here
   }
+  
   xw->x=x;
   xw->y=y;
-
-
 }
+
+
+
 
 DEFUN("xwidget-embed-steal-window", Fxwidget_embed_steal_window, Sxwidget_embed_steal_window,
       2,2,0,
@@ -303,9 +330,9 @@ DEFUN("xwidget-set-keyboard-grab", Fxwidget_set_keyboard_grab,Sxwidget_set_keybo
     {
       xwidget_owns_kbd=FALSE;
     }
-      /*
+  /*
     gdk_keyboard_grab(xw->widget,TRUE,GDK_CURRENT_TIME);
-  else
+    else
     gdk_keyboard_ungrab(GDK_CURRENT_TIME);
   */
   return Qnil;
@@ -498,11 +525,11 @@ void  xwidget_end_redisplay(struct glyph_matrix* matrix){
   int i;
   struct xwidget* xw;
   /*  for(i=0;i<MAX_XWIDGETS;i++){
-    xw=&xwidgets[i];
-    if(!xw->redisplayed && xw->initialized && region_modified)
+      xw=&xwidgets[i];
+      if(!xw->redisplayed && xw->initialized && region_modified)
       {
-        printf("xwidget %d would have been deleted\n",xw->id);
-        //xwidget_delete(xw);
+      printf("xwidget %d would have been deleted\n",xw->id);
+      //xwidget_delete(xw);
       }
       }*/
   region_modified=0;
@@ -556,7 +583,7 @@ void  xwidget_end_redisplay(struct glyph_matrix* matrix){
         else
           xwidget_hide(xw);
       }
-}
+  }
 }
 
 /* some type of modification was made to the buffers*/
