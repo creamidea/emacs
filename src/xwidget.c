@@ -234,6 +234,9 @@ void x_draw_xwidget_glyph_string (s)
   XSetForeground (s->display, s->gc, xgcv.background);
   XFillRectangle (s->display, s->window, s->gc, x, y, xw->width, height);
   XSetForeground (s->display, s->gc, xgcv.foreground);
+
+    int clipx=min(xw->width,WINDOW_RIGHT_EDGE_X(s->w)-x);
+    int clipy=min(xw->height,WINDOW_BOTTOM_EDGE_Y(s->w)-WINDOW_MODE_LINE_HEIGHT(s->w)-y);
   
   if(drawing_in_selected_window){
     if(xw->x != x || xw->y != y) //has it moved?
@@ -247,18 +250,32 @@ void x_draw_xwidget_glyph_string (s)
     //adjust size of the widget window if some parts happen to be outside drawable area
     //that is, we should clip
     //an emacs window is not a gtk window, a gtk window covers the entire frame
-    int clipx=min(xw->width,WINDOW_RIGHT_EDGE_X(s->w)-x);
-    int clipy=min(xw->height,WINDOW_BOTTOM_EDGE_Y(s->w)-WINDOW_MODE_LINE_HEIGHT(s->w)-y);
     gtk_widget_set_size_request (GTK_WIDGET(xw->widgetwindow) , clipx,   clipy);
 
   }else{
     //ok, we are painting the xwidgets in non-selected window
     //we cant get real widgets here, so we draw a simple rectangle instead(for now)
-    XGCValues xgcv;
-    XGetGCValues (s->display, s->gc, GCForeground | GCBackground, &xgcv);
-    XFillRectangle (s->display, s->window, s->gc, x, y, xw->width, xw->height);
+    /* XGCValues xgcv; */
+    /* XGetGCValues (s->display, s->gc, GCForeground | GCBackground, &xgcv); */
+    /* XFillRectangle (s->display, s->window, s->gc, x, y, xw->width, xw->height); */
     //TODO write alternate text on top of rect here
     //TODO have a look at of-screen rendering of gtk widgets and use that here
+    //TODO do something about showing the buffer on another frame also
+    GdkPixmap* xw_snapshot=gtk_widget_get_snapshot (xw->widget,NULL);
+        GdkGC* gdkgc = gdk_gc_new(xw_snapshot);
+        gdk_draw_line (xw_snapshot,
+                       gdkgc,
+                       0,
+                       0,
+                       xw->width,
+                       xw->height);
+        gdk_draw_drawable(gtk_widget_get_window(s->f->gwfixed), //convert to GdkWindow from gtkWindow
+                        gdkgc, xw_snapshot,
+                      0,0,
+                      x,y,
+                          clipx,clipy);
+                          //xw->width,xw->height);
+        
   }
   
   xw->x=x;

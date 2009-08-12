@@ -2640,7 +2640,7 @@ x_draw_glyph_string (s)
 {
   int relief_drawn_p = 0;
 
-  printf("x_draw_glyph_string: %d\n",s->first_glyph->type);
+  //printf("x_draw_glyph_string: %d\n",s->first_glyph->type);
   /* If S draws into the background of its successors, draw the
      background of the successors first so that S can draw into it.
      This makes S->next use XDrawString instead of XDrawImageString.  */
