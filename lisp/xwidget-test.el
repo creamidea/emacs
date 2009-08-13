@@ -1,17 +1,18 @@
 ;;test like:
 ;; cd /path/to/xwidgets-emacs-dir
 ;; make   all&&  src/emacs -q --eval "(progn (load \"`pwd`/lisp/xwidget-test.el\") (xwidget-demo-basic))"
-;; m-x xwidget-demo-basic
+
 
 ;; you should see:
 ;; - a gtk button
 ;; - a gtk toggle button
 ;; - a gtk slider button
 ;; - an xembed window(using gtk_socket) showing another emacs instance
+;; - an xembed window(using gtk_socket) showing an uzbl web browser if its installed
 
 ;;the widgets will move when you type in the buffer. good!
 
-;;there will be redrawing issues when widgets change row. bad!
+;;there will be redrawing issues when widgets change rows, etc. bad!
 
 ;;its currently difficult to give kbd focus to the xembedded emacs,
 ;;but try evaling the following:
@@ -38,11 +39,11 @@
 (defun xwidget-demo-basic ()
   (interactive)
   (insert "xwidgetdemo<<< a button. another button\n")
-  (xwidget-insert (point-min) 1 1 "1" 40 50)
-  (xwidget-insert          15 2 2 "2" 60 30)
-  (xwidget-insert          30 3 3 "3" 400 200)
-  (xwidget-insert          20 4 4 "4" 100 50)
-  (xwidget-insert          40 5 3 "5" 400 400)
+  (xwidget-insert (point-min) 1 1 "button" 40  50)
+  (xwidget-insert          15 2 2 "toggle" 60  30)
+  (xwidget-insert          30 3 3 "emacs"  400 200)
+  (xwidget-insert          20 4 4 "slider" 100 50)
+  (xwidget-insert          40 5 3 "uzbl"   400 400)
   (define-key (current-local-map) [xwidget-event] 'xwidget-handler-demo-basic)
 )
 
@@ -69,11 +70,10 @@
 ;emacs
 ;mplayer
 ;surf
+;uzbl
 
 ;try the openvrml:
 ;/usr/libexec/openvrml-xembed 0 ~/Desktop/HelloWorld.wrl
-
-
 
 
 (defun xwidget-handler-demo-basic ()
