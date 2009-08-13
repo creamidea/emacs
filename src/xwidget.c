@@ -200,10 +200,6 @@ void x_draw_xwidget_glyph_string (s)
   
   //  printf("x_draw_xwidget_glyph_string: id:%d %d %d  (%d,%d,%d,%d) selected win:%d\n",
   //     s->xwidget_id, box_line_hwidth, box_line_vwidth, s->x,s->y,s->height,s->width, drawing_in_selected_window);
-  //Screen *screen = FRAME_X_SCREEN (s->f); 
-  //int depth = DefaultDepthOfScreen (screen); 
-  ///////////////////////////////////////////////////////
-  // stuff that affects x,y: menu, toolbar, scrollbar
   struct xwidget* xw=&xwidgets[s->xwidget_id];
   
   int x=s->x;
@@ -213,18 +209,7 @@ void x_draw_xwidget_glyph_string (s)
     xwidget_init(xw,s,x,y);
   }
 
-  //move doesnt seem to quite remove the previous drawing of the widget, so perhaps i should clear
-  // the area before or after move?
-  //or maybe emacs would handle erase better if i somehow communicated widget size better to emacs
-
   //ok, we are painting the xwidgets in non-selected window
-  //we cant get real widgets here, so we draw a simple rectangle instead(for now)
-  XGCValues xgcv;
-  XGetGCValues (s->display, s->gc, GCForeground | GCBackground, &xgcv);
-  XSetForeground (s->display, s->gc, xgcv.background);
-  XFillRectangle (s->display, s->window, s->gc, x, y, xw->width, height);
-  XSetForeground (s->display, s->gc, xgcv.foreground);
-
   //calculate clip widht and height, which is used bot for the xwidget
   //and its phantom counterpart
   int clipx=min(xw->width,WINDOW_RIGHT_EDGE_X(s->w)-x);
