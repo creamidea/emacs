@@ -132,46 +132,32 @@ static void send_xembed_ready_event(int xwid,int xembedid){
 }
 
 
-/* xwidgets can only be "live" in exactly one window.
-   that is, there is only ever 1 gtk widget belonging to a xwidget.
-   then there might be phantom xwidgets, 
-*/
-struct window* xwidget_live_window=0;
-
-void printnativerect(XRectangle rect){
-  printf("xwidget clip:%d %d %d %d\n ",
-         rect.x,rect.y,rect.width,rect.height);
-}
-
 void xwidget_init(struct xwidget* xw, struct glyph_string *s,int x, int y)
      
 {
-  printf("once for xwidget %d\n",s->xwidget_id);
     xw->initialized=1;
     xw->id=s->xwidget_id;
 
+    //widget creation
     switch(xw->type){
     case 1:
-      printf("mk button\n");
       xw->widget=gtk_button_new_with_label (xw->title); 
       g_signal_connect (G_OBJECT (xw->widget), "clicked", G_CALLBACK (buttonclick_handler), xw);
       break;
     case 2:
-      printf("mk togglebutton\n");
       xw->widget=gtk_toggle_button_new_with_label (    xw->title);
       break;
     case 3:
-
       xw->widget=gtk_socket_new ();
-      printf("mk socket\n");
       break;
     case 4:
       xw->widget=gtk_hscale_new (GTK_ADJUSTMENT(gtk_adjustment_new(0,0,100,1,1,0)));
       gtk_scale_set_draw_value(GTK_SCALE(xw->widget),FALSE); //i think its emacs role to show text and stuff, so disable the widgets own text
-      printf("mk hscale\n");
     }
+    //widget realization
     // mk container widget 1st, and put the widget inside
-    //later, drawing should crop container window if necessary to handle case where xwidget is near bottom of emacs window
+    //later, drawing should crop container window if necessary to handle case where xwidget
+    //is partially obscured by other emacs windows
     xw->widgetwindow = GTK_CONTAINER(gtk_layout_new(NULL,NULL));
     gtk_layout_set_size (GTK_LAYOUT(xw->widgetwindow) ,xw->width,xw->height);
     gtk_container_add(xw->widgetwindow, xw->widget);
@@ -179,11 +165,14 @@ void xwidget_init(struct xwidget* xw, struct glyph_string *s,int x, int y)
     gtk_fixed_put(GTK_FIXED(s->f->gwfixed),GTK_WIDGET(xw->widgetwindow) ,x,y);
     gtk_widget_show_all (GTK_WIDGET(xw->widgetwindow) );
 
-    if(xw->type==3){
+    //widgettype specific initialization only possible after realization
+    switch(xw->type){
+    case 3:
       printf("socket id:%x %d\n", gtk_socket_get_id (GTK_SOCKET(xw->widget)), gtk_socket_get_id (GTK_SOCKET(xw->widget)));
       send_xembed_ready_event(xw->id,gtk_socket_get_id (GTK_SOCKET(xw->widget)));
+      break;
     }
-  }
+}
 
 void x_draw_xwidget_glyph_string (s)
      struct glyph_string *s;
@@ -195,8 +184,6 @@ void x_draw_xwidget_glyph_string (s)
   
   int drawing_in_selected_window=(XWINDOW(FRAME_SELECTED_WINDOW (s->f))) ==  (s->w); 
 
-  //we assume the live window is the last one drawn in
-  xwidget_live_window=s->w;
   
   //  printf("x_draw_xwidget_glyph_string: id:%d %d %d  (%d,%d,%d,%d) selected win:%d\n",
   //     s->xwidget_id, box_line_hwidth, box_line_vwidth, s->x,s->y,s->height,s->width, drawing_in_selected_window);
@@ -249,9 +236,7 @@ void x_draw_xwidget_glyph_string (s)
                       0,0,
                       x,y,
                           clipx,clipy);
-                          //xw->width,xw->height);
-        
-  }
+    }
   
   xw->x=x;
   xw->y=y;
@@ -515,12 +500,8 @@ void  xwidget_end_redisplay(struct glyph_matrix* matrix){
   //iterate desired glyph matrix of "live" window here, hide gtk widgets
   //not in the desired matrix.
   int area;
-  //  xwidget_live_window=XWINDOW (selected_window);
-  // the live window needs to be a window with actual xwidgets
-  //the window pointer also ought to be checked for validity
-  //also, the current scheme will fail on the case of several buffers showing xwidgets
+  //the current scheme will fail on the case of several buffers showing xwidgets
   
-  //  struct glyph_matrix* matrix=xwidget_live_window->desired_matrix;
   //  dump_glyph_matrix(matrix, 2);
   for (i = 0; i < matrix->nrows; ++i){
     //    dump_glyph_row (MATRIX_ROW (matrix, i), i, glyphs);
