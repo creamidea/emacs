@@ -172,19 +172,9 @@ void xwidget_init(struct xwidget* xw, struct glyph_string *s,int x, int y)
     }
     // mk container widget 1st, and put the widget inside
     //later, drawing should crop container window if necessary to handle case where xwidget is near bottom of emacs window
-    //TODO use gtk_fixed rather than scrolled window
     xw->widgetwindow = GTK_CONTAINER(gtk_layout_new(NULL,NULL));
-    //    gtk_scrolled_window_set_policy(GTK_SCROLLED_WINDOW(xw->widgetwindow), GTK_POLICY_NEVER, GTK_POLICY_NEVER);
-    //   GtkContainer* gtkfixed=GTK_CONTAINER (gtk_fixed_new());
-    
-    //gtk_container_add(xw->widgetwindow,  GTK_WIDGET(gtkfixed));
-    
     gtk_layout_set_size (GTK_LAYOUT(xw->widgetwindow) ,xw->width,xw->height);
-    
-    //gtk_container_add(gtkfixed, xw->widget);
     gtk_container_add(xw->widgetwindow, xw->widget);
-    
-    //gtk_widget_set_size_request (xw->widget ,xw->width,xw->height);
     gtk_widget_set_size_request(GTK_WIDGET(xw->widget) ,xw->width,xw->height);
     gtk_fixed_put(GTK_FIXED(s->f->gwfixed),GTK_WIDGET(xw->widgetwindow) ,x,y);
     gtk_widget_show_all (GTK_WIDGET(xw->widgetwindow) );
@@ -208,8 +198,8 @@ void x_draw_xwidget_glyph_string (s)
   //we assume the live window is the last one drawn in
   xwidget_live_window=s->w;
   
-  printf("x_draw_xwidget_glyph_string: id:%d %d %d  (%d,%d,%d,%d) selected win:%d\n",
-         s->xwidget_id, box_line_hwidth, box_line_vwidth, s->x,s->y,s->height,s->width, drawing_in_selected_window);
+  //  printf("x_draw_xwidget_glyph_string: id:%d %d %d  (%d,%d,%d,%d) selected win:%d\n",
+  //     s->xwidget_id, box_line_hwidth, box_line_vwidth, s->x,s->y,s->height,s->width, drawing_in_selected_window);
   //Screen *screen = FRAME_X_SCREEN (s->f); 
   //int depth = DefaultDepthOfScreen (screen); 
   ///////////////////////////////////////////////////////
@@ -235,8 +225,10 @@ void x_draw_xwidget_glyph_string (s)
   XFillRectangle (s->display, s->window, s->gc, x, y, xw->width, height);
   XSetForeground (s->display, s->gc, xgcv.foreground);
 
-    int clipx=min(xw->width,WINDOW_RIGHT_EDGE_X(s->w)-x);
-    int clipy=min(xw->height,WINDOW_BOTTOM_EDGE_Y(s->w)-WINDOW_MODE_LINE_HEIGHT(s->w)-y);
+  //calculate clip widht and height, which is used bot for the xwidget
+  //and its phantom counterpart
+  int clipx=min(xw->width,WINDOW_RIGHT_EDGE_X(s->w)-x);
+  int clipy=min(xw->height,WINDOW_BOTTOM_EDGE_Y(s->w)-WINDOW_MODE_LINE_HEIGHT(s->w)-y);
   
   if(drawing_in_selected_window){
     if(xw->x != x || xw->y != y) //has it moved?
@@ -254,12 +246,10 @@ void x_draw_xwidget_glyph_string (s)
 
   }else{
     //ok, we are painting the xwidgets in non-selected window
-    //we cant get real widgets here, so we draw a simple rectangle instead(for now)
-    /* XGCValues xgcv; */
-    /* XGetGCValues (s->display, s->gc, GCForeground | GCBackground, &xgcv); */
-    /* XFillRectangle (s->display, s->window, s->gc, x, y, xw->width, xw->height); */
-    //TODO write alternate text on top of rect here
-    //TODO have a look at of-screen rendering of gtk widgets and use that here
+    //we cant get real widgets here, so we try to fetch a snapshot of
+    //the xwidget and paint that as a phantom image. if that fails, we
+    //get an even simpler phantom(grey rectangle currently)
+
     //TODO do something about showing the buffer on another frame also
     GdkPixmap* xw_snapshot=gtk_widget_get_snapshot (xw->widget,NULL);
         GdkGC* gdkgc = gdk_gc_new(xw_snapshot);
@@ -437,12 +427,12 @@ int valid_xwidget_p (object) Lisp_Object object;
 
 
 void xwidget_hide(struct xwidget* xw){
-  printf("xwidget %d hidden\n",xw->id);
+  //printf("xwidget %d hidden\n",xw->id);
   gtk_widget_hide(GTK_WIDGET(xw->widgetwindow));
 }
 
 void xwidget_show(struct xwidget* xw){
-  printf("xwidget %d shown\n",xw->id);
+  //printf("xwidget %d shown\n",xw->id);
   gtk_widget_show(GTK_WIDGET(xw->widgetwindow));
 }
 
@@ -527,7 +517,7 @@ void   xwidget_start_redisplay(){
 
 /* the xwidget was touched during redisplay, so it isnt a candidate for deletion*/
 void xwidget_touch(struct xwidget* xw){
-  printf("touch xwidget %d\n", xw->id);
+  //printf("touch xwidget %d\n", xw->id);
   xw->redisplayed=1;
 }
 
@@ -535,14 +525,6 @@ void xwidget_touch(struct xwidget* xw){
 void  xwidget_end_redisplay(struct glyph_matrix* matrix){
   int i;
   struct xwidget* xw;
-  /*  for(i=0;i<MAX_XWIDGETS;i++){
-      xw=&xwidgets[i];
-      if(!xw->redisplayed && xw->initialized && region_modified)
-      {
-      printf("xwidget %d would have been deleted\n",xw->id);
-      //xwidget_delete(xw);
-      }
-      }*/
   region_modified=0;
   xwidget_start_redisplay();
   //iterate desired glyph matrix of "live" window here, hide gtk widgets
@@ -566,7 +548,7 @@ void  xwidget_end_redisplay(struct glyph_matrix* matrix){
           struct glyph *glyph_end = glyph + row->used[area];
           for (; glyph < glyph_end; ++glyph){
             if (glyph->type == XWIDGET_GLYPH){
-              printf("(%d)",glyph->u.xwidget_id);
+              //printf("(%d)",glyph->u.xwidget_id);
               //here the id sometimes sucks, so maybe the desired glyph matrix isnt ready here?
               //also, it appears the desired matrix is not the entire window, but only the changed part. wtf?
               int id=glyph->u.xwidget_id;
@@ -575,9 +557,9 @@ void  xwidget_end_redisplay(struct glyph_matrix* matrix){
                 //dump_glyph_matrix(matrix, 2);
                 return;
               }
-              else
-                printf("row %d not enabled\n", i);
-              
+              else{
+                // printf("row %d not enabled\n", i);
+              }
               xwidget_touch(&xwidgets[glyph->u.xwidget_id]);
             }
           }
@@ -615,7 +597,7 @@ void xwidget_delete(struct xwidget* xw){
 
 
 
-
+/* redraw all xwidgets */
 void xwidget_invalidate(){
   int i;
   struct xwidget* xw;
