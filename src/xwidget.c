@@ -137,7 +137,8 @@ void xwidget_init(struct xwidget* xw, struct glyph_string *s,int x, int y)
 {
     xw->initialized=1;
     xw->id=s->xwidget_id;
-
+    xw->hidden=0;
+    
     //widget creation
     switch(xw->type){
     case 1:
@@ -158,6 +159,7 @@ void xwidget_init(struct xwidget* xw, struct glyph_string *s,int x, int y)
     // mk container widget 1st, and put the widget inside
     //later, drawing should crop container window if necessary to handle case where xwidget
     //is partially obscured by other emacs windows
+    xw->emacswindow=GTK_CONTAINER(s->f->gwfixed);
     xw->widgetwindow = GTK_CONTAINER(gtk_layout_new(NULL,NULL));
     gtk_layout_set_size (GTK_LAYOUT(xw->widgetwindow) ,xw->width,xw->height);
     gtk_container_add(xw->widgetwindow, xw->widget);
@@ -210,11 +212,17 @@ void x_draw_xwidget_glyph_string (s)
     else
       {
       }
-    gtk_fixed_move(GTK_FIXED(s->f->gwfixed),GTK_WIDGET(xw->widgetwindow) ,x,y);    
-    //adjust size of the widget window if some parts happen to be outside drawable area
-    //that is, we should clip
-    //an emacs window is not a gtk window, a gtk window covers the entire frame
-    gtk_widget_set_size_request (GTK_WIDGET(xw->widgetwindow) , clipx,   clipy);
+    if(xw->hidden==0)
+      {
+      gtk_fixed_move(GTK_FIXED(s->f->gwfixed),GTK_WIDGET(xw->widgetwindow) ,x,y);    
+      //adjust size of the widget window if some parts happen to be outside drawable area
+      //that is, we should clip
+      //an emacs window is not a gtk window, a gtk window covers the entire frame
+      gtk_widget_set_size_request (GTK_WIDGET(xw->widgetwindow) , clipx,   clipy);
+    }else{
+      //xwidget is hidden, hide it offscreen somewhere, still realized, so we may snapshot it
+      //gtk_fixed_move(GTK_FIXED(s->f->gwfixed),GTK_WIDGET(xw->widgetwindow) ,10000,10000);
+    }
 
   }else{
     //ok, we are painting the xwidgets in non-selected window
@@ -396,14 +404,20 @@ int valid_xwidget_p (object) Lisp_Object object;
 /* } */
 
 
+/* hidden means not being seen in the "live" window.
+   a phantom might be seen somewhere though */
 void xwidget_hide(struct xwidget* xw){
   //printf("xwidget %d hidden\n",xw->id);
-  gtk_widget_hide(GTK_WIDGET(xw->widgetwindow));
+  xw->hidden=1;
+  //gtk_widget_hide(GTK_WIDGET(xw->widgetwindow));
+  gtk_fixed_move(GTK_FIXED(xw->emacswindow),GTK_WIDGET(xw->widgetwindow) ,10000,10000);
 }
 
 void xwidget_show(struct xwidget* xw){
   //printf("xwidget %d shown\n",xw->id);
-  gtk_widget_show(GTK_WIDGET(xw->widgetwindow));
+  xw->hidden=0;
+  //gtk_widget_show(GTK_WIDGET(xw->widgetwindow));
+  gtk_fixed_move(GTK_FIXED(xw->emacswindow),GTK_WIDGET(xw->widgetwindow) ,xw->x,xw->y);
 }
 
 

@@ -15,6 +15,7 @@ each xwidget instance is described by this struct.
 struct xwidget{
   int id;
   int type;
+  int hidden;
   GtkWidget* widget;
   GtkContainer* widgetwindow;
 
@@ -25,6 +26,7 @@ struct xwidget{
   int x; int y;
   Lisp_Object message_hook;
   int redisplayed;
+  GtkContainer* emacswindow;
 };
 
 
