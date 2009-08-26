@@ -234,11 +234,19 @@ of[ \t]+\"?\\([a-zA-Z]?:?[^\":\n]+\\)\"?:" 3 2 nil (1))
      (2 (compilation-face '(3))))
 
     (gnu
-     ;; I have no idea what this first line is supposed to match, but it
-     ;; makes things ambiguous with output such as "foo:344:50:blabla" since
-     ;; the "foo" part can match this first line (in which case the file
-     ;; name as "344").  To avoid this, the second line disallows filenames
-     ;; exclusively composed of digits.  --Stef
+     ;; The first line matches the program name for
+
+     ;;     PROGRAM:SOURCE-FILE-NAME:LINENO: MESSAGE
+
+     ;; format, which is used for non-interactive programs other than
+     ;; compilers (e.g. the "jade:" entry in compilation.txt).
+
+     ;; This first line makes things ambiguous with output such as
+     ;; "foo:344:50:blabla" since the "foo" part can match this first
+     ;; line (in which case the file name as "344").  To avoid this,
+     ;; the second line disallows filenames exclusively composed of
+     ;; digits.
+
      ;; Similarly, we get lots of false positives with messages including
      ;; times of the form "HH:MM:SS" where MM is taken as a line number, so
      ;; the last line tries to rule out message where the info after the
@@ -2070,10 +2078,12 @@ and overlay is highlighted between MK and END-MK."
       (if (window-dedicated-p (selected-window))
           (pop-to-buffer (marker-buffer mk))
         (switch-to-buffer (marker-buffer mk))))
-    ;; If narrowing gets in the way of going to the right place, widen.
     (unless (eq (goto-char mk) (point))
+      ;; If narrowing gets in the way of going to the right place, widen.
       (widen)
-      (goto-char mk))
+      (if next-error-move-function
+	  (funcall next-error-move-function msg mk)
+	(goto-char mk)))
     (if end-mk
         (push-mark end-mk t)
       (if mark-active (setq mark-active)))

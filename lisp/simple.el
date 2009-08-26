@@ -183,8 +183,15 @@ of the errors before moving.
 Major modes providing compile-like functionality should set this variable
 to indicate to `next-error' that this is a candidate buffer and how
 to navigate in it.")
-
 (make-variable-buffer-local 'next-error-function)
+
+(defvar next-error-move-function nil
+  "Function to use to move to an error locus.
+It takes two arguments, a buffer position in the error buffer
+and a buffer position in the error locus buffer.
+The buffer for the error locus should already be current.
+nil means use goto-char using the second argument position.")
+(make-variable-buffer-local 'next-error-move-function)
 
 (defsubst next-error-buffer-p (buffer
 			       &optional avoid-current
@@ -361,7 +368,7 @@ select the source buffer."
   (interactive "p")
   (next-error-no-select (- (or n 1))))
 
-;;; Internal variable for `next-error-follow-mode-post-command-hook'.
+;; Internal variable for `next-error-follow-mode-post-command-hook'.
 (defvar next-error-follow-last-line nil)
 
 (define-minor-mode next-error-follow-minor-mode
@@ -375,8 +382,8 @@ location."
     (add-hook 'post-command-hook 'next-error-follow-mode-post-command-hook nil t)
     (make-local-variable 'next-error-follow-last-line)))
 
-;;; Used as a `post-command-hook' by `next-error-follow-mode'
-;;; for the *Compilation* *grep* and *Occur* buffers.
+;; Used as a `post-command-hook' by `next-error-follow-mode'
+;; for the *Compilation* *grep* and *Occur* buffers.
 (defun next-error-follow-mode-post-command-hook ()
   (unless (equal next-error-follow-last-line (line-number-at-pos))
     (setq next-error-follow-last-line (line-number-at-pos))
@@ -847,12 +854,15 @@ that uses or sets the mark."
   "Goto LINE, counting from line 1 at beginning of buffer.
 Normally, move point in the current buffer, and leave mark at the
 previous position.  With just \\[universal-argument] as argument,
-move point in the most recently selected other buffer, and switch
-to it.  When called from Lisp code, the optional argument BUFFER
-specifies a buffer to switch to.
+move point in the most recently selected other buffer, and switch to it.
 
-If there's a number in the buffer at point, it is the default for
-LINE."
+If there's a number in the buffer at point, it is the default for LINE.
+
+This function is usually the wrong thing to use in a Lisp program.
+What you probably want instead is something like:
+  (goto-char (point-min)) (forward-line (1- N))
+If at all possible, an even better solution is to use char counts
+rather than line counts."
   (interactive
    (if (and current-prefix-arg (not (consp current-prefix-arg)))
        (list (prefix-numeric-value current-prefix-arg))
@@ -892,7 +902,7 @@ LINE."
   ;; Move to the specified line number in that buffer.
   (save-restriction
     (widen)
-    (goto-char 1)
+    (goto-char (point-min))
     (if (eq selective-display t)
 	(re-search-forward "[\n\C-m]" nil 'end (1- line))
       (forward-line (1- line)))))
@@ -2503,6 +2513,17 @@ value passed."
       (when stderr-file (delete-file stderr-file))
       (when lc (delete-file lc)))))
 
+(defvar process-file-side-effects t
+  "Whether a call of `process-file' changes remote files.
+
+Per default, this variable is always set to `t', meaning that a
+call of `process-file' could potentially change any file on a
+remote host.  When set to `nil', a file handler could optimize
+its behaviour with respect to remote file attributes caching.
+
+This variable should never be changed by `setq'.  Instead of, it
+shall be set only by let-binding.")
+
 (defun start-file-process (name buffer program &rest program-args)
   "Start a program in a subprocess.  Return the process object for it.
 
@@ -4092,29 +4113,30 @@ into account variable-width characters and line continuation."
 ;; Arg says how many lines to move.  The value is t if we can move the
 ;; specified number of lines.
 (defun line-move-visual (arg &optional noerror)
-  (let ((posn (posn-at-point))
-	(opoint (point))
+  (let ((opoint (point))
 	(hscroll (window-hscroll))
-	x)
+	target-hscroll)
     ;; Check if the previous command was a line-motion command, or if
     ;; we were called from some other command.
-    (cond ((and (consp temporary-goal-column)
-		(memq last-command `(next-line previous-line ,this-command)))
-	   ;; If so, there's no need to reset `temporary-goal-column',
-	   ;; unless the window hscroll has changed.
-	   (when (/= hscroll (cdr temporary-goal-column))
-	     (set-window-hscroll nil 0)
-	     (setq temporary-goal-column
-		   (cons (+ (car temporary-goal-column)
-			    (cdr temporary-goal-column)) 0))))
-	  ;; Otherwise, we should reset `temporary-goal-column'.
-	  ;; Handle the `overflow-newline-into-fringe' case:
-	  ((eq (nth 1 posn) 'right-fringe)
-	   (setq temporary-goal-column (cons (- (window-width) 1) hscroll)))
-	  ((setq x (car (posn-x-y posn)))
-	   (setq temporary-goal-column
-		 (cons (/ (float x) (frame-char-width)) hscroll))))
-    ;; Move using `vertical-motion'.
+    (if (and (consp temporary-goal-column)
+	     (memq last-command `(next-line previous-line ,this-command)))
+	;; If so, there's no need to reset `temporary-goal-column',
+	;; but we may need to hscroll.
+	(if (or (/= (cdr temporary-goal-column) hscroll)
+		(>  (cdr temporary-goal-column) 0))
+	    (setq target-hscroll (cdr temporary-goal-column)))
+      ;; Otherwise, we should reset `temporary-goal-column'.
+      (let ((posn (posn-at-point)))
+	(cond
+	 ;; Handle the `overflow-newline-into-fringe' case:
+	 ((eq (nth 1 posn) 'right-fringe)
+	  (setq temporary-goal-column (cons (- (window-width) 1) hscroll)))
+	 ((car (posn-x-y posn))
+	  (setq temporary-goal-column
+		(cons (/ (float (car (posn-x-y posn)))
+			 (frame-char-width)) hscroll))))))
+    (if target-hscroll
+	(set-window-hscroll (selected-window) target-hscroll))
     (or (and (= (vertical-motion
 		 (cons (or goal-column
 			   (if (consp temporary-goal-column)
@@ -4285,7 +4307,7 @@ into account variable-width characters and line continuation."
 	       (point))))
 
 	;; Move to the desired column.
-	(line-move-to-column column)
+	(line-move-to-column (truncate column))
 
 	;; Corner case: suppose we start out in a field boundary in
 	;; the middle of a continued line.  When we get to
@@ -4464,8 +4486,8 @@ To ignore intangibility, bind `inhibit-point-motion-hooks' to t."
 				     (/= arg 1) t nil)))))
 
 
-;;; Many people have said they rarely use this feature, and often type
-;;; it by accident.  Maybe it shouldn't even be on a key.
+;; Many people have said they rarely use this feature, and often type
+;; it by accident.  Maybe it shouldn't even be on a key.
 (put 'set-goal-column 'disabled t)
 
 (defun set-goal-column (arg)
@@ -5844,13 +5866,19 @@ to decide what to delete."
 	     minibuffer-completion-table
 	     ;; If this is reading a file name, and the file name chosen
 	     ;; is a directory, don't exit the minibuffer.
-	     (if (and minibuffer-completing-file-name
-		      (file-directory-p (field-string (point-max))))
-		 (let ((mini (active-minibuffer-window)))
-		   (select-window mini)
-		   (when minibuffer-auto-raise
-		     (raise-frame (window-frame mini))))
-	       (exit-minibuffer)))))))
+             (let* ((result (buffer-substring (field-beginning) (point)))
+                    (bounds
+                     (completion-boundaries result minibuffer-completion-table
+                                            minibuffer-completion-predicate
+                                            "")))
+               (if (eq (car bounds) (length result))
+                   ;; The completion chosen leads to a new set of completions
+                   ;; (e.g. it's a directory): don't exit the minibuffer yet.
+                   (let ((mini (active-minibuffer-window)))
+                     (select-window mini)
+                     (when minibuffer-auto-raise
+                       (raise-frame (window-frame mini))))
+                 (exit-minibuffer))))))))
 
 (define-derived-mode completion-list-mode nil "Completion List"
   "Major mode for buffers showing lists of possible completions.
@@ -6308,8 +6336,8 @@ have both Backspace, Delete and F1 keys.
 See also `normal-erase-is-backspace'."
   (interactive "P")
   (let ((enabled (or (and arg (> (prefix-numeric-value arg) 0))
-		     (and (not arg)
-			  (not (eq 1 (terminal-parameter
+		     (not (or arg
+                              (eq 1 (terminal-parameter
 				      nil 'normal-erase-is-backspace)))))))
     (set-terminal-parameter nil 'normal-erase-is-backspace
 			    (if enabled 1 0))

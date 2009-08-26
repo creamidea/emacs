@@ -134,7 +134,8 @@ Invoke the bzr command adding `BZR_PROGRESS_BAR=none' and
   (with-temp-buffer
     (set-buffer-multibyte nil)
     (let ((prog sha1-program)
-          (args nil))
+          (args nil)
+	  process-file-side-effects)
       (when (consp prog)
 	(setq args (cdr prog))
         (setq prog (car prog)))
@@ -457,7 +458,7 @@ REV non-nil gets an error."
   (remove-hook 'log-view-mode-hook 'vc-bzr-log-view-mode) ;Deactivate the hack.
   (require 'add-log)
   (set (make-local-variable 'log-view-per-file-logs) nil)
-  (set (make-local-variable 'log-view-file-re) "^Working file:[ \t]+\\(.+\\)")
+  (set (make-local-variable 'log-view-file-re) "\\`a\\`")
   (set (make-local-variable 'log-view-message-re)
        "^ *\\(?:revno: \\([0-9.]+\\)\\|merged: .+\\)")
   (set (make-local-variable 'log-view-font-lock-keywords)
@@ -481,16 +482,11 @@ REV non-nil gets an error."
   ;; FIXME: `vc-bzr-command' runs `bzr log' with `LC_MESSAGES=C', so
   ;; the log display may not what the user wants - but I see no other
   ;; way of getting the above regexps working.
-  (dolist (file files)
-    (vc-exec-after
-     `(let ((inhibit-read-only t))
-        (with-current-buffer buffer
-          ;; Insert the file name so that log-view.el can find it.
-          (insert "Working file: " ',file "\n")) ;; Like RCS/CVS.
-        (apply 'vc-bzr-command "log" ',buffer 'async ',file
-               ',(if (stringp vc-bzr-log-switches)
-                     (list vc-bzr-log-switches)
-                   vc-bzr-log-switches))))))
+  (with-current-buffer buffer
+    (apply 'vc-bzr-command "log" buffer 'async files
+	   (if (stringp vc-bzr-log-switches)
+	       (list vc-bzr-log-switches)
+	     vc-bzr-log-switches))))
 
 (defun vc-bzr-show-log-entry (revision)
   "Find entry for patch name REVISION in bzr change log buffer."
@@ -597,14 +593,6 @@ stream.  Standard error output is discarded."
     (cons
      (apply #'process-file command nil (list (current-buffer) nil) nil args)
      (buffer-substring (point-min) (point-max)))))
-
-(defun vc-bzr-prettify-state-info (file)
-  "Bzr-specific version of `vc-prettify-state-info'."
-  (if (eq 'edited (vc-state file))
-        (concat "(" (symbol-name (or (vc-file-getprop file 'vc-bzr-state)
-                                     'edited)) ")")
-    ;; else fall back to default vc.el representation
-    (vc-default-prettify-state-info 'Bzr file)))
 
 (defstruct (vc-bzr-extra-fileinfo
             (:copier nil)
@@ -756,7 +744,8 @@ stream.  Standard error output is discarded."
        ((string-match "\\`\\(tag\\):" string)
         (let ((prefix (substring string 0 (match-end 0)))
               (tag (substring string (match-end 0)))
-              (table nil))
+              (table nil)
+	      process-file-side-effects)
           (with-temp-buffer
             ;; "bzr-1.2 tags" is much faster with --show-ids.
             (process-file vc-bzr-program nil '(t) nil "tags" "--show-ids")

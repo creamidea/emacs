@@ -225,12 +225,6 @@
 ;;   The default implementation deals well with all states that
 ;;   `vc-state' can return.
 ;;
-;; - prettify-state-info (file)
-;;
-;;   Translate the `vc-state' property of FILE into a string that can be
-;;   used in a human-readable buffer.  The default implementation deals well
-;;   with all states that `vc-state' can return.
-;;
 ;; STATE-CHANGING FUNCTIONS
 ;;
 ;; * create-repo (backend)
@@ -313,6 +307,8 @@
 ;;   arg CONTENTS-DONE is non-nil, then the contents of FILE have
 ;;   already been reverted from a version backup, and this function
 ;;   only needs to update the status of FILE within the backend.
+;;   If FILE is in the `added' state it should be returned to the
+;;   `unregistered' state.
 ;;
 ;; - rollback (files)
 ;;
@@ -1481,7 +1477,8 @@ returns t if the buffer had changes, nil otherwise."
     ;; I made it conditional on vc-diff-added-files but it should probably
     ;; just be removed (or copied/moved to specific backends).  --Stef.
     (when vc-diff-added-files
-      (let ((filtered '()))
+      (let ((filtered '())
+	    process-file-side-effects)
         (dolist (file files)
           (if (or (file-directory-p file)
                   (not (string= (vc-working-revision file) "0")))
@@ -1828,7 +1825,7 @@ allowed and simply skipped)."
       (vc-call-backend ',backend 'log-view-mode)
       (set (make-local-variable 'log-view-vc-backend) ',backend)
       (set (make-local-variable 'log-view-vc-fileset) ',files)
-      
+
       ;; FIXME: this seems to apply only to RCS/CVS, it doesn't quite
       ;; belong here in the generic code.
       (goto-char (point-max))
@@ -2385,26 +2382,6 @@ to provide the `find-revision' operation instead."
 	  (with-current-buffer buffer
 	    (insert-file-contents-literally tmpfile)))
       (delete-file tmpfile))))
-
-(defun vc-default-prettify-state-info (backend file)
-  (let* ((state (vc-state file))
-	(statestring
-	 (cond
-	  ((stringp state) (concat "(locked:" state ")"))
-	  ((eq state 'edited) "(modified)")
-	  ((eq state 'needs-merge) "(merge)")
-	  ((eq state 'needs-update) "(update)")
-	  ((eq state 'added) "(added)")
-	  ((eq state 'removed) "(removed)")
-          ((eq state 'ignored) "(ignored)")
-          ((eq state 'unregistered) "(unregistered)")
-	  ((eq state 'unlocked-changes) "(stale)")
-	  (t (format "(unknown:%s)" state))))
-	(buffer
-	 (get-file-buffer file))
-	(modflag
-	 (if (and buffer (buffer-modified-p buffer)) "+" "")))
-    (concat statestring modflag)))
 
 (defun vc-default-rename-file (backend old new)
   (condition-case nil

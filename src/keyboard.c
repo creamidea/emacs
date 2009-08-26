@@ -1520,12 +1520,13 @@ cancel_hourglass_unwind (arg)
 }
 #endif
 
+extern int nonundocount;	/* Declared in cmds.c.  */
+
 Lisp_Object
 command_loop_1 ()
 {
   Lisp_Object cmd;
   int lose;
-  int nonundocount;
   Lisp_Object keybuf[30];
   int i;
   int prev_modiff = 0;
@@ -1541,7 +1542,6 @@ command_loop_1 ()
   waiting_for_input = 0;
   cancel_echoing ();
 
-  nonundocount = 0;
   this_command_key_count = 0;
   this_command_key_count_reset = 0;
   this_single_command_key_start = 0;
@@ -1899,7 +1899,7 @@ command_loop_1 ()
 #endif
 
             nonundocount = 0;
-            if (NILP (current_kboard->Vprefix_arg))
+            if (NILP (current_kboard->Vprefix_arg)) /* FIXME: Why?  --Stef  */
               Fundo_boundary ();
             Fcommand_execute (Vthis_command, Qnil, Qnil, Qnil);
 
@@ -3661,6 +3661,12 @@ static int
 readable_events (flags)
      int flags;
 {
+#ifdef HAVE_DBUS
+  /* Check whether a D-Bus message has arrived.  */
+  if (xd_pending_messages () > 0)
+    return 1;
+#endif /* HAVE_DBUS */
+
   if (flags & READABLE_EVENTS_DO_TIMERS_NOW)
     timer_check (1);
 
@@ -6994,7 +7000,7 @@ gobble_input (expected)
      int expected;
 {
 #ifdef HAVE_DBUS
-  /* Check whether a D-Bus message has arrived.  */
+  /* Read D-Bus messages.  */
   xd_read_queued_messages ();
 #endif /* HAVE_DBUS */
 
@@ -7350,7 +7356,7 @@ tty_read_avail_input (struct terminal *terminal,
     {
       struct coding_system *coding = TERMINAL_KEYBOARD_CODING (terminal);
       int from;
-      
+
       /* Decode the key sequence except for those with meta
 	 modifiers.  */
       for (i = from = 0; ; i++)
@@ -11983,9 +11989,9 @@ syms_of_keyboard ()
       }
   }
 
-  button_down_location = Fmake_vector (make_number (1), Qnil);
+  button_down_location = Fmake_vector (make_number (5), Qnil);
   staticpro (&button_down_location);
-  mouse_syms = Fmake_vector (make_number (1), Qnil);
+  mouse_syms = Fmake_vector (make_number (5), Qnil);
   staticpro (&mouse_syms);
   wheel_syms = Fmake_vector (make_number (4), Qnil);
   staticpro (&wheel_syms);
@@ -12340,7 +12346,7 @@ might happen repeatedly and make Emacs nonfunctional.  */);
 #endif
   Qecho_area_clear_hook = intern ("echo-area-clear-hook");
   staticpro (&Qecho_area_clear_hook);
-  SET_SYMBOL_VALUE (Qecho_area_clear_hook, Qnil);
+  Fset (Qecho_area_clear_hook, Qnil);
 
   DEFVAR_LISP ("lucid-menu-bar-dirty-flag", &Vlucid_menu_bar_dirty_flag,
 	       doc: /* Non-nil means menu bar, specified Lucid style, needs to be recomputed.  */);

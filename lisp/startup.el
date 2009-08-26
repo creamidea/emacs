@@ -741,13 +741,9 @@ opening the first frame (e.g. open a connection to an X server).")
   ;; Set the default strings to display in mode line for
   ;; end-of-line formats that aren't native to this platform.
   (cond
-   ((memq system-type '(ms-dos windows-nt emx))
+   ((memq system-type '(ms-dos windows-nt))
     (setq eol-mnemonic-unix "(Unix)"
           eol-mnemonic-mac  "(Mac)"))
-   ;; Both Mac and Unix EOLs are now "native" on Mac OS so keep the
-   ;; abbreviated strings `/' and `:' set in coding.c for them.
-   ((eq system-type 'macos)
-    (setq eol-mnemonic-dos  "(DOS)"))
    (t                                   ; this is for Unix/GNU/Linux systems
     (setq eol-mnemonic-dos  "(DOS)"
           eol-mnemonic-mac  "(Mac)")))
@@ -2258,8 +2254,9 @@ A fancy display is used on graphic displays, normal otherwise."
 		     (if (= file-count 1)
 			 (setq first-file-buffer (find-file file))
 		       (find-file-other-window file)))
-		   (or (zerop line)
-		       (goto-line line))
+		   (unless (zerop line)
+		     (goto-char (point-min))
+		     (forward-line (1- line)))
 		   (setq line 0)
 		   (unless (< column 1)
 		     (move-to-column (1- column)))
@@ -2292,8 +2289,9 @@ A fancy display is used on graphic displays, normal otherwise."
 				   (inhibit-startup-screen
 				    (find-file-other-window file))
 				   (t (find-file file))))
-			   (or (zerop line)
-			       (goto-line line))
+			   (unless (zerop line)
+			     (goto-char (point-min))
+			     (forward-line (1- line)))
 			   (setq line 0)
 			   (unless (< column 1)
 			     (move-to-column (1- column)))

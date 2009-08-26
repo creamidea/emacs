@@ -6886,7 +6886,7 @@ init_display ()
 #endif
      )
     {
-      Vinitial_window_system = intern ("x");
+      Vinitial_window_system = Qx;
 #ifdef HAVE_X11
       Vwindow_system_version = make_number (11);
 #endif
@@ -6904,7 +6904,7 @@ init_display ()
 #ifdef HAVE_NTGUI
   if (!inhibit_window_system)
     {
-      Vinitial_window_system = intern ("w32");
+      Vinitial_window_system = Qw32;
       Vwindow_system_version = make_number (1);
       adjust_frame_glyphs_initially ();
       return;
@@ -6918,7 +6918,7 @@ init_display ()
 #endif
       )
     {
-      Vinitial_window_system = intern("ns");
+      Vinitial_window_system = Qns;
       Vwindow_system_version = make_number(10);
       adjust_frame_glyphs_initially ();
       return;

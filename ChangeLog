@@ -1,3 +1,31 @@
+2009-08-23  Ken Raeburn  <raeburn@raeburn.org>
+
+	* Makefile.in (install-arch-indep): If the versioned DOC-####
+	generated during loadup+dump isn't found, install the plain DOC
+	file that always gets generated, in case CANNOT_DUMP is set.
+
+	* configure.in: Warn if package version specified here doesn't
+	match the version in version.el.
+	* configure: Regenerate.
+
+2009-08-22  Michael Albinus  <michael.albinus@gmx.de>
+
+	* configure.in: AC_CHECK_FUNCS dbus_watch_get_unix_fd.
+
+	* configure: Regenerate.
+
+2009-08-19  Glenn Morris  <rgm@gnu.org>
+
+	* INSTALL: Remove reference to cvtmail.
+
+2009-08-15  CHENG Gao  <chenggao@gmail.com>
+
+	* Makefile.in (install-arch-indep): Remove .DS_Store files (MacOSX).
+
+2009-08-02  Kevin Ryde <user42@zip.com.au>
+
+	* INSTALL: Fix free fonts URL.
+
 2009-07-22  Glenn Morris  <rgm@gnu.org>
 
 	* configure.in (AC_PREREQ): Require autoconf 2.62.

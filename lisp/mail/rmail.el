@@ -139,57 +139,28 @@ its character representation and its display representation.")
   :prefix "rmail-edit-"
   :group 'rmail)
 
-(defgroup rmail-obsolete nil
-  "Rmail obsolete customization variables."
-  :group 'rmail)
-
 (defcustom rmail-movemail-program nil
   "If non-nil, the file name of the `movemail' program."
   :group 'rmail-retrieve
   :type '(choice (const nil) string))
 
-(defcustom rmail-pop-password nil
-  "Password to use when reading mail from POP server.
-Please use `rmail-remote-password' instead."
-  :type '(choice (string :tag "Password")
-		 (const :tag "Not Required" nil))
-  :group 'rmail-obsolete)
-
-(defcustom rmail-pop-password-required nil
-  "Non-nil if a password is required when reading mail from a POP server.
-Please use rmail-remote-password-required instead."
-  :type 'boolean
-  :group 'rmail-obsolete)
+(define-obsolete-variable-alias 'rmail-pop-password
+  'rmail-remote-password "22.1")
 
 (defcustom rmail-remote-password nil
   "Password to use when reading mail from a remote server.
 This setting is ignored for mailboxes whose URL already contains a password."
   :type '(choice (string :tag "Password")
 		 (const :tag "Not Required" nil))
-  :set-after '(rmail-pop-password)
-  :set #'(lambda (symbol value)
-	   (set-default symbol
-			(if (and (not value)
-                                 (boundp 'rmail-pop-password)
-				 rmail-pop-password)
-			    rmail-pop-password
-			  value))
-	   (setq rmail-pop-password nil))
   :group 'rmail-retrieve
   :version "22.1")
+
+(define-obsolete-variable-alias 'rmail-pop-password-required
+  'rmail-remote-password-required "22.1")
 
 (defcustom rmail-remote-password-required nil
   "Non-nil if a password is required when reading mail from a remote server."
   :type 'boolean
-  :set-after '(rmail-pop-password-required)
-  :set #'(lambda (symbol value)
-	   (set-default symbol
-			(if (and (not value)
-                                 (boundp 'rmail-pop-password-required)
-				 rmail-pop-password-required)
-			    rmail-pop-password-required
-			  value))
-	   (setq rmail-pop-password-required nil))
   :group 'rmail-retrieve
   :version "22.1")
 
@@ -2072,27 +2043,32 @@ new messages.  Return the number of new messages."
 	    (start (point))
 	    (value "------U-")
 	    (case-fold-search nil)
-	    limit)
+	    (delim (concat "\n\n" rmail-unix-mail-delimiter))
+	    limit stop)
 	;; Detect an empty inbox file.
 	(unless (= start (point-max))
 	  ;; Scan the new messages to establish a count and to ensure that
 	  ;; an attribute header is present.
-	  (while (looking-at "From ")
-	    ;; Determine if a new attribute header needs to be added to
-	    ;; the message.
-	    (if (search-forward "\n\n" nil t)
-		(progn
-		  (setq count (1+ count))
-		  (narrow-to-region start (point))
-		  (unless (mail-fetch-field rmail-attribute-header)
-		    (backward-char 1)
-		    (insert rmail-attribute-header ": " value "\n"))
-		  (widen))
-	      (rmail-error-bad-format))
-	    ;; Move to the next message.
-	    (if (search-forward "\n\nFrom " nil 'move)
-		(forward-char -5))
-	    (setq start (point))))
+	  (if (looking-at rmail-unix-mail-delimiter)
+	      (while (not stop)
+		;; Determine if a new attribute header needs to be
+		;; added to the message.
+		(if (search-forward "\n\n" nil t)
+		    (progn
+		      (setq count (1+ count))
+		      (narrow-to-region start (point))
+		      (unless (mail-fetch-field rmail-attribute-header)
+			(backward-char 1)
+			(insert rmail-attribute-header ": " value "\n"))
+		      (widen))
+		  (rmail-error-bad-format))
+		;; Move to the next message.
+		(if (not (re-search-forward delim nil 'move))
+		    (setq stop t)
+		  (goto-char (match-beginning 0))
+		  (forward-char 2))
+		(setq start (point)))
+	    (rmail-error-bad-format)))
 	count))))
 
 (defun rmail-get-header-1 (name)
@@ -2152,9 +2128,9 @@ If MSG is nil, use the current message."
 	(nmax (length rmail-attr-array))
 	result temp)
     (when value
-      (if (/= (length value) nmax)
+      (if (> (length value) nmax)
           (message "Warning: corrupt attribute header in message")
-        (dotimes (index nmax)
+        (dotimes (index (length value))
           (setq temp (and (not (= ?- (aref value index)))
                           (nth 1 (aref rmail-attr-array index)))
                 result
@@ -2364,12 +2340,11 @@ change the invisible header text."
 (defun rmail-forget-messages ()
   (unwind-protect
       (if (vectorp rmail-message-vector)
-	  (let* ((i 0)
-		 (v rmail-message-vector)
+	  (let* ((v rmail-message-vector)
 		 (n (length v)))
-	    (while (< i n)
-	      (move-marker (aref v i)  nil)
-	      (setq i (1+ i)))))
+	    (dotimes (i n)
+	      (if (aref v i)
+		  (move-marker (aref v i)  nil)))))
     (setq rmail-message-vector nil)
     (setq rmail-msgref-vector nil)
     (setq rmail-deleted-vector nil)))
@@ -2435,20 +2410,25 @@ Output a helpful message unless NOMSG is non-nil."
 	;; the entry for message N+1, which marks
 	;; the end of message N.  (N = number of messages).
 	(setq messages-head (list (point-marker)))
-	(rmail-set-message-counters-counter (min (point) point-save))
-	(setq messages-after-point total-messages)
+	(setq messages-after-point 
+	      (or (rmail-set-message-counters-counter (min (point) point-save))
+		  0))
 
-	;; Determine how many precede point.
-	(rmail-set-message-counters-counter)
 	(setq rmail-total-messages total-messages)
 	(setq rmail-current-message
 	      (min total-messages
 		   (max 1 (- total-messages messages-after-point))))
-	(setq rmail-message-vector
-	      (apply 'vector (cons (point-min-marker) messages-head))
-	      rmail-deleted-vector (concat "0" deleted-head)
-	      rmail-summary-vector (make-vector rmail-total-messages nil)
+
+	;; Make an element 0 in rmail-message-vector and rmail-deleted-vector
+	;; which will never be used.
+	(push nil messages-head)
+	(push ?0 deleted-head)
+	(setq rmail-message-vector (apply 'vector messages-head)
+	      rmail-deleted-vector (concat deleted-head))
+
+	(setq rmail-summary-vector (make-vector rmail-total-messages nil)
 	      rmail-msgref-vector (make-vector (1+ rmail-total-messages) nil))
+
 	(let ((i 0))
 	  (while (<= i rmail-total-messages)
 	    (aset rmail-msgref-vector i (list i))
@@ -2475,26 +2455,34 @@ the message.  Point is at the beginning of the message."
 		    ?D
 		  ?\s) deleted-head))))
 
-(defun rmail-set-message-counters-counter (&optional stop)
-  ;; Collect the start position for each message into 'messages-head.
-  (let ((start (point)))
-    (while (search-backward "\n\nFrom " stop t)
+(defun rmail-set-message-counters-counter (&optional spot-to-find)
+  "Collect the start positions of messages in list `messages-head'.
+Return the number of messages after the one containing SPOT-TO-FIND."
+  (let ((start (point))
+	messages-after-spot)
+    (while (search-backward "\n\nFrom " nil t)
       (forward-char 2)
-      (rmail-collect-deleted start)
-      (setq messages-head (cons (point-marker) messages-head)
-	    total-messages (1+ total-messages)
-	    start (point))
-      ;; Show progress after every 20 messages or so.
-      (if (zerop (% total-messages 20))
-	  (message "Counting messages...%d" total-messages)))
+      (when (looking-at rmail-unix-mail-delimiter)
+	(if (and (<= (point) spot-to-find)
+		 (null messages-after-spot))
+	    (setq messages-after-spot total-messages))
+	(rmail-collect-deleted start)
+	(setq messages-head (cons (point-marker) messages-head)
+	      total-messages (1+ total-messages)
+	      start (point))
+	;; Show progress after every 20 messages or so.
+	(if (zerop (% total-messages 20))
+	    (message "Counting messages...%d" total-messages))))
     ;; Handle the first message, maybe.
-    (if stop
-	(goto-char stop)
-      (goto-char (point-min)))
-    (unless (not (looking-at "From "))
+    (goto-char (point-min))
+    (unless (not (looking-at rmail-unix-mail-delimiter))
+      (if (and (<= (point) spot-to-find)
+	       (null messages-after-spot))
+	  (setq messages-after-spot total-messages))
       (rmail-collect-deleted start)
       (setq messages-head (cons (point-marker) messages-head)
-	    total-messages (1+ total-messages)))))
+	    total-messages (1+ total-messages)))
+    messages-after-spot))
 
 ;; Display a message.
 

@@ -425,7 +425,8 @@ else the global value will be modified."
 
 (defvar byte-compile-interactive-only-functions
   '(beginning-of-buffer end-of-buffer replace-string replace-regexp
-    insert-file insert-buffer insert-file-literally previous-line next-line)
+    insert-file insert-buffer insert-file-literally previous-line next-line
+    goto-line)
   "List of commands that are not meant to be called from Lisp.")
 
 (defvar byte-compile-not-obsolete-var nil
@@ -853,7 +854,9 @@ otherwise pop it")
 	      (t			; Absolute jump
 	       (setq pc (car (cdr (car bytes))))	; Pick PC from tag
 	       (setcar (cdr bytes) (logand pc 255))
-	       (setcar bytes (lsh pc -8))))
+	       (setcar bytes (lsh pc -8))
+               ;; FIXME: Replace this by some workaround.
+               (if (> (car bytes) 255) (error "Bytecode overflow"))))
 	(setq patchlist (cdr patchlist))))
     (apply 'unibyte-string (nreverse bytes))))
 
@@ -901,8 +904,10 @@ Each function's symbol gets added to `byte-compile-noruntime-functions'."
 	  (while (and hist-new (not (eq hist-new hist-orig)))
 	    (let ((xs (pop hist-new)))
 	      ;; Make sure the file was not already loaded before.
-	      (when (and (equal (car xs) "cl") (not (assoc (car xs) hist-orig)))
-		(byte-compile-find-cl-functions)))))))))
+	      (and (stringp (car xs))
+		   (string-match "^cl\\>" (file-name-nondirectory (car xs)))
+		   (not (assoc (car xs) hist-orig))
+		   (byte-compile-find-cl-functions)))))))))
 
 (defun byte-compile-eval-before-compile (form)
   "Evaluate FORM for `eval-and-compile'."
@@ -1971,8 +1976,8 @@ and will be removed soon.  See (elisp)Backquote in the manual."))
 				      (beginning-of-line)
 				      (point)))
 	(insert ";;; This file contains utf-8 non-ASCII characters\n"
-		";;; and therefore cannot be loaded into Emacs 21 or earlier.\n")
-	;; Replace "19" or "19.29" with "22", twice.
+		";;; and therefore cannot be loaded into Emacs 22 or earlier.\n")
+	;; Replace "19" or "19.29" with "23", twice.
 	(re-search-forward "19\\(\\.[0-9]+\\)")
 	(replace-match "23")
 	(re-search-forward "19\\(\\.[0-9]+\\)")
@@ -2321,8 +2326,10 @@ list that represents a doc string reference.
   (let ((args (mapcar 'eval (cdr form))))
     (apply 'require args)
     ;; Detect (require 'cl) in a way that works even if cl is already loaded.
-    (if (member (car args) '("cl" cl))
-        (byte-compile-disable-warning 'cl-functions)))
+    (when (and (member (car args) '("cl" cl))
+	       (byte-compile-warning-enabled-p 'cl-functions))
+      (byte-compile-warn "cl package required at runtime")
+      (byte-compile-disable-warning 'cl-functions)))
   (byte-compile-keep-pending form 'byte-compile-normal-call))
 
 (put 'progn 'byte-hunk-handler 'byte-compile-file-form-progn)

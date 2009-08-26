@@ -493,6 +493,7 @@ a -*- line.
 The command \\[normal-mode], when used interactively,
 always obeys file local variable specifications and the -*- line,
 and ignores this variable."
+  :risky t
   :type '(choice (const :tag "Query Unsafe" t)
 		 (const :tag "Safe Only" :safe)
 		 (const :tag "Do all" :all)
@@ -514,6 +515,7 @@ specified in a -*- line.")
 The value can be t, nil or something else.
 A value of t means obey `eval' variables.
 A value of nil means ignore them; anything else means query."
+  :risky t
   :type '(choice (const :tag "Obey" t)
 		 (const :tag "Ignore" nil)
 		 (other :tag "Query" other))
@@ -830,10 +832,12 @@ Return nil if COMMAND is not found anywhere in `exec-path'."
 
 (defun load-library (library)
   "Load the Emacs Lisp library named LIBRARY.
-This is one of two interfaces (the other being `load-file') to the underlying
-function `load'.  The library actually loaded is searched for in `load-path'
-with or without the `load-suffixes' (as well as `load-file-rep-suffixes').
-See Info node `(emacs)Lisp Libraries' for more details."
+This is an interface to the function `load'.  LIBRARY is searched
+for in `load-path', both with and without `load-suffixes' (as
+well as `load-file-rep-suffixes').
+
+See Info node `(emacs)Lisp Libraries' for more details.
+See `load-file' for a different interface to `load'."
   (interactive
    (list (completing-read "Load library: "
 			  (apply-partially 'locate-file-completion-table
@@ -2155,7 +2159,7 @@ since only a single case-insensitive search through the alist is made."
      ("Imakefile\\'" . makefile-imake-mode)
      ("Makeppfile\\(?:\\.mk\\)?\\'" . makefile-makepp-mode) ; Put this before .mk
      ("\\.makepp\\'" . makefile-makepp-mode)
-     ,@(if (memq system-type '(berkeley-unix next-mach darwin))
+     ,@(if (memq system-type '(berkeley-unix darwin))
 	   '(("\\.mk\\'" . makefile-bsdmake-mode)
 	     ("GNUmakefile\\'" . makefile-gmake-mode)
 	     ("[Mm]akefile\\'" . makefile-bsdmake-mode))
@@ -2221,7 +2225,7 @@ ARC\\|ZIP\\|LZH\\|LHA\\|ZOO\\|[JEW]AR\\|XPI\\|RAR\\)\\'" . archive-mode)
      ("\\.x[ms]l\\'" . xml-mode)
      ("\\.dtd\\'" . sgml-mode)
      ("\\.ds\\(ss\\)?l\\'" . dsssl-mode)
-     ("\\.js\\'" . java-mode)		; javascript-mode would be better
+     ("\\.js\\'" . js-mode)		; javascript-mode would be better
      ("\\.[ds]?v\\'" . verilog-mode)
      ;; .emacs or .gnus or .viper following a directory delimiter in
      ;; Unix, MSDOG or VMS syntax.
@@ -2304,6 +2308,7 @@ appear in `auto-coding-alist' with `no-conversion' coding system.
 See also `interpreter-mode-alist', which detects executable script modes
 based on the interpreters they specify to run,
 and `magic-mode-alist', which determines modes based on file contents.")
+(put 'auto-mode-alist 'risky-local-variable t)
 
 (defun conf-mode-maybe ()
   "Select Conf mode or XML mode according to start of file."
@@ -2639,6 +2644,7 @@ Otherwise, return nil; point may be changed."
   '(ignored-local-variables safe-local-variable-values
     file-local-variables-alist dir-local-variables-alist)
   "Variables to be ignored in a file's local variable spec.")
+(put 'ignored-local-variables 'risky-local-variable t)
 
 (defvar hack-local-variables-hook nil
   "Normal hook run after processing a file's local variables specs.
@@ -2649,6 +2655,7 @@ in order to initialize other data structure based on them.")
   "List variable-value pairs that are considered safe.
 Each element is a cons cell (VAR . VAL), where VAR is a variable
 symbol and VAL is a value that is considered safe."
+  :risky t
   :group 'find-file
   :type 'alist)
 
@@ -2657,6 +2664,7 @@ symbol and VAL is a value that is considered safe."
 Add expressions to this list if you want Emacs to evaluate them, when
 they appear in an `eval' local variable specification, without first
 asking you for confirmation."
+  :risky t
   :group 'find-file
   :version "22.2"
   :type '(repeat sexp))
@@ -2664,63 +2672,34 @@ asking you for confirmation."
 ;; Risky local variables:
 (mapc (lambda (var) (put var 'risky-local-variable t))
       '(after-load-alist
-	auto-mode-alist
 	buffer-auto-save-file-name
 	buffer-file-name
 	buffer-file-truename
 	buffer-undo-list
-	dabbrev-case-fold-search
-	dabbrev-case-replace
 	debugger
 	default-text-properties
-	display-time-string
-	enable-local-eval
-	enable-local-variables
 	eval
 	exec-directory
 	exec-path
 	file-name-handler-alist
-	font-lock-defaults
-	format-alist
 	frame-title-format
 	global-mode-string
 	header-line-format
 	icon-title-format
-	ignored-local-variables
-	imenu--index-alist
-	imenu-generic-expression
 	inhibit-quit
-	input-method-alist
 	load-path
 	max-lisp-eval-depth
 	max-specpdl-size
-	minor-mode-alist
 	minor-mode-map-alist
 	minor-mode-overriding-map-alist
-	mode-line-buffer-identification
 	mode-line-format
-	mode-line-client
-	mode-line-modes
-	mode-line-modified
-	mode-line-mule-info
-	mode-line-position
-	mode-line-process
-	mode-line-remote
 	mode-name
-	outline-level
 	overriding-local-map
 	overriding-terminal-local-map
-	parse-time-rules
 	process-environment
-	rmail-output-file-alist
-	safe-local-variable-values
-	safe-local-eval-forms
-	save-some-buffers-action-alist
-	special-display-buffer-names
 	standard-input
 	standard-output
-	unread-command-events
-	vc-mode))
+	unread-command-events))
 
 ;; Safe local variables:
 ;;
@@ -3189,7 +3168,12 @@ already the major mode."
 				     "-mode"))))
 	   (unless (eq (indirect-function mode)
 		       (indirect-function major-mode))
-	     (funcall mode))))
+	     (if (memq mode minor-mode-list)
+		 ;; A minor mode must be passed an argument.
+		 ;; Otherwise, if the user enables the minor mode in a
+		 ;; major mode hook, this would toggle it off.
+		 (funcall mode 1)
+	       (funcall mode)))))
 	((eq var 'eval)
 	 (save-excursion (eval val)))
 	(t
@@ -4392,6 +4376,7 @@ This requires the external program `diff' to be in your `exec-path'."
            nil)
 	"view changes in this buffer"))
   "ACTION-ALIST argument used in call to `map-y-or-n-p'.")
+(put 'save-some-buffers-action-alist 'risky-local-variable t)
 
 (defvar buffer-save-without-query nil
   "Non-nil means `save-some-buffers' should save this buffer without asking.")
@@ -5384,7 +5369,7 @@ fail.  It returns also nil when DIR is a remote directory.
 
 This function calls `file-system-info' if it is available, or invokes the
 program specified by `directory-free-space-program' if that is non-nil."
-  (when (not (file-remote-p dir))
+  (unless (file-remote-p dir)
     ;; Try to find the number of free blocks.  Non-Posix systems don't
     ;; always have df, but might have an equivalent system call.
     (if (fboundp 'file-system-info)
@@ -5394,12 +5379,14 @@ program specified by `directory-free-space-program' if that is non-nil."
       (save-match-data
 	(with-temp-buffer
 	  (when (and directory-free-space-program
-		     (let ((default-directory
-			     (if (and (not (file-remote-p default-directory))
-				      (file-directory-p default-directory)
-				      (file-readable-p default-directory))
-				 default-directory
-			       (expand-file-name "~/"))))
+		     ;; Avoid failure if the default directory does
+		     ;; not exist (Bug#2631, Bug#3911).
+		     (let ((default-directory default-directory))
+		       (setq dir (expand-file-name dir))
+		       (unless (and (not (file-remote-p default-directory))
+				    (file-directory-p default-directory)
+				    (file-readable-p default-directory))
+			 (setq default-directory "/"))
 		       (eq (call-process directory-free-space-program
 					 nil t nil
 					 directory-free-space-args

@@ -1,3 +1,42 @@
+2009-08-26  Ulrich Mueller  <ulm@gentoo.org>
+
+	* nonascii.texi (Character Codes): Fix typos.
+
+2009-08-25  Michael Albinus  <michael.albinus@gmx.de>
+
+	* processes.texi (Synchronous Processes): New defvar
+	process-file-side-effects.
+
+2009-08-25  Glenn Morris  <rgm@gnu.org>
+
+	* display.texi (Fontsets): Fix typo.
+
+	* files.texi (Format Conversion Round-Trip): Mention nil regexp.
+
+2009-08-19  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* processes.texi (Asynchronous Processes): Adjust arglist of
+	start-process-shell-command and start-file-process-shell-command.
+
+2009-08-15  Chong Yidong  <cyd@stupidchicken.com>
+
+	* advice.texi (Argument Access in Advice): Note that argument
+	positions are zero-based (Bug#3932).
+
+	* commands.texi (Distinguish Interactive): Minor copyedit.
+
+	* display.texi (Face Attributes): Add xref to Displaying Faces for
+	explanation of "underlying face".
+
+	* customize.texi (Common Keywords): Add xref to Loading.
+
+	* loading.texi (How Programs Do Loading): Add xref to Lisp
+	Libraries node in the Emacs manual.
+
+2009-08-13  Chong Yidong  <cyd@stupidchicken.com>
+
+	* objects.texi (Meta-Char Syntax): Add xref to Strings of Events.
+
 2009-07-18  Chong Yidong  <cyd@stupidchicken.com>
 
 	* processes.texi (Shell Arguments): Copyedits.

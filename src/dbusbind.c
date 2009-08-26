@@ -29,6 +29,7 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 
 
 /* Subroutines.  */
+Lisp_Object Qdbus_init_bus;
 Lisp_Object Qdbus_get_unique_name;
 Lisp_Object Qdbus_call_method;
 Lisp_Object Qdbus_call_method_asynchronously;
@@ -475,11 +476,13 @@ xd_append_arg (dtype, object, iter)
 	}
 
       case DBUS_TYPE_DOUBLE:
-	XD_DEBUG_MESSAGE ("%c %f", dtype, XFLOAT_DATA (object));
-	if (!dbus_message_iter_append_basic (iter, dtype,
-					     &XFLOAT_DATA (object)))
-	  XD_SIGNAL2 (build_string ("Unable to append argument"), object);
-	return;
+	{
+	  double val = XFLOAT_DATA (object);
+	  XD_DEBUG_MESSAGE ("%c %f", dtype, val);
+	  if (!dbus_message_iter_append_basic (iter, dtype, &val))
+	    XD_SIGNAL2 (build_string ("Unable to append argument"), object);
+	  return;
+	}
 
       case DBUS_TYPE_STRING:
       case DBUS_TYPE_OBJECT_PATH:
@@ -699,8 +702,13 @@ xd_initialize (bus)
 
   /* Parameter check.  */
   CHECK_SYMBOL (bus);
-  if (!((EQ (bus, QCdbus_system_bus)) || (EQ (bus, QCdbus_session_bus))))
+  if (!(EQ (bus, QCdbus_system_bus) || EQ (bus, QCdbus_session_bus)))
     XD_SIGNAL2 (build_string ("Wrong bus name"), bus);
+
+  /* We do not want to have an autolaunch for the session bus.  */
+  if (EQ (bus, QCdbus_session_bus)
+      && getenv ("DBUS_SESSION_BUS_ADDRESS") == NULL)
+    XD_SIGNAL2 (build_string ("No connection to bus"), bus);
 
   /* Open a connection to the bus.  */
   dbus_error_init (&derror);
@@ -714,13 +722,100 @@ xd_initialize (bus)
     XD_ERROR (derror);
 
   if (connection == NULL)
-    XD_SIGNAL2 (build_string ("No connection"), bus);
+    XD_SIGNAL2 (build_string ("No connection to bus"), bus);
 
   /* Cleanup.  */
   dbus_error_free (&derror);
 
   /* Return the result.  */
   return connection;
+}
+
+
+/* Add connection file descriptor to input_wait_mask, in order to
+   let select() detect, whether a new message has been arrived.  */
+dbus_bool_t
+xd_add_watch (watch, data)
+     DBusWatch *watch;
+     void *data;
+{
+  /* We check only for incoming data.  */
+  if (dbus_watch_get_flags (watch) & DBUS_WATCH_READABLE)
+    {
+#if HAVE_DBUS_WATCH_GET_UNIX_FD
+      /* TODO: Reverse these on Win32, which prefers the opposite. */
+      int fd = dbus_watch_get_unix_fd(watch);
+      if (fd == -1)
+	fd = dbus_watch_get_socket(watch);
+#else
+      int fd = dbus_watch_get_fd(watch);
+#endif
+      XD_DEBUG_MESSAGE ("%d", fd);
+
+      if (fd == -1)
+	return FALSE;
+
+      /* Add the file descriptor to input_wait_mask.  */
+      add_keyboard_wait_descriptor (fd);
+    }
+
+  /* Return.  */
+  return TRUE;
+}
+
+/* Remove connection file descriptor from input_wait_mask.  */
+void
+xd_remove_watch (watch, data)
+     DBusWatch *watch;
+     void *data;
+{
+  /* We check only for incoming data.  */
+  if (dbus_watch_get_flags (watch) & DBUS_WATCH_READABLE)
+    {
+#if HAVE_DBUS_WATCH_GET_UNIX_FD
+      /* TODO: Reverse these on Win32, which prefers the opposite. */
+      int fd = dbus_watch_get_unix_fd(watch);
+      if (fd == -1)
+	fd = dbus_watch_get_socket(watch);
+#else
+      int fd = dbus_watch_get_fd(watch);
+#endif
+      XD_DEBUG_MESSAGE ("%d", fd);
+
+      if (fd == -1)
+	return;
+
+      /* Remove the file descriptor from input_wait_mask.  */
+      delete_keyboard_wait_descriptor (fd);
+    }
+
+  /* Return.  */
+  return;
+}
+
+DEFUN ("dbus-init-bus", Fdbus_init_bus, Sdbus_init_bus, 1, 1, 0,
+       doc: /* Initialize connection to D-Bus BUS.
+This is an internal function, it shall not be used outside dbus.el.  */)
+     (bus)
+     Lisp_Object bus;
+{
+  DBusConnection *connection;
+
+  /* Check parameters.  */
+  CHECK_SYMBOL (bus);
+
+  /* Open a connection to the bus.  */
+  connection = xd_initialize (bus);
+
+  /* Add the watch functions.  */
+  if (!dbus_connection_set_watch_functions (connection,
+					    xd_add_watch,
+					    xd_remove_watch,
+					    NULL, NULL, NULL))
+    XD_SIGNAL1 (build_string ("Cannot add watch functions"));
+
+  /* Return.  */
+  return Qnil;
 }
 
 DEFUN ("dbus-get-unique-name", Fdbus_get_unique_name, Sdbus_get_unique_name,
@@ -758,7 +853,7 @@ offered by SERVICE.  It must provide METHOD.
 
 If the parameter `:timeout' is given, the following integer TIMEOUT
 specifies the maximun number of milliseconds the method call must
-return.  The default value is 25.000.  If the method call doesn't
+return.  The default value is 25,000.  If the method call doesn't
 return in time, a D-Bus error is raised.
 
 All other arguments ARGS are passed to METHOD as arguments.  They are
@@ -961,11 +1056,12 @@ object path SERVICE is registered at.  INTERFACE is an interface
 offered by SERVICE.  It must provide METHOD.
 
 HANDLER is a Lisp function, which is called when the corresponding
-return message has arrived.
+return message has arrived.  If HANDLER is nil, no return message will
+be expected.
 
 If the parameter `:timeout' is given, the following integer TIMEOUT
 specifies the maximun number of milliseconds the method call must
-return.  The default value is 25.000.  If the method call doesn't
+return.  The default value is 25,000.  If the method call doesn't
 return in time, a D-Bus error is raised.
 
 All other arguments ARGS are passed to METHOD as arguments.  They are
@@ -981,7 +1077,7 @@ converted into D-Bus types via the following rules:
 All arguments can be preceded by a type symbol.  For details about
 type symbols, see Info node `(dbus)Type Conversion'.
 
-The function returns a key into the hash table
+Unless HANDLER is nil, the function returns a key into the hash table
 `dbus-registered-functions-table'.  The corresponding entry in the
 hash table is removed, when the return message has been arrived, and
 HANDLER is called.
@@ -1026,7 +1122,7 @@ usage: (dbus-call-method-asynchronously BUS SERVICE PATH INTERFACE METHOD HANDLE
   CHECK_STRING (path);
   CHECK_STRING (interface);
   CHECK_STRING (method);
-  if (!FUNCTIONP (handler))
+  if (!NILP (handler) && !FUNCTIONP (handler))
     wrong_type_argument (intern ("functionp"), handler);
   GCPRO6 (bus, service, path, interface, method, handler);
 
@@ -1085,18 +1181,34 @@ usage: (dbus-call-method-asynchronously BUS SERVICE PATH INTERFACE METHOD HANDLE
       xd_append_arg (dtype, args[i], &iter);
     }
 
-  /* Send the message.  The message is just added to the outgoing
-     message queue.  */
-  if (!dbus_connection_send_with_reply (connection, dmessage, NULL, timeout))
-    XD_SIGNAL1 (build_string ("Cannot send message"));
+  if (!NILP (handler))
+    {
+      /* Send the message.  The message is just added to the outgoing
+	 message queue.  */
+      if (!dbus_connection_send_with_reply (connection, dmessage,
+					    NULL, timeout))
+	XD_SIGNAL1 (build_string ("Cannot send message"));
+
+      /* The result is the key in Vdbus_registered_functions_table.  */
+      result = (list2 (bus, make_number (dbus_message_get_serial (dmessage))));
+
+      /* Create a hash table entry.  */
+      Fputhash (result, handler, Vdbus_registered_functions_table);
+    }
+  else
+    {
+      /* Send the message.  The message is just added to the outgoing
+	 message queue.  */
+      if (!dbus_connection_send (connection, dmessage, NULL))
+	XD_SIGNAL1 (build_string ("Cannot send message"));
+
+      result = Qnil;
+    }
+
+  /* Flush connection to ensure the message is handled.  */
+  dbus_connection_flush (connection);
 
   XD_DEBUG_MESSAGE ("Message sent");
-
-  /* The result is the key in Vdbus_registered_functions_table.  */
-  result = (list2 (bus, make_number (dbus_message_get_serial (dmessage))));
-
-  /* Create a hash table entry.  */
-  Fputhash (result, handler, Vdbus_registered_functions_table);
 
   /* Cleanup.  */
   dbus_message_unref (dmessage);
@@ -1412,6 +1524,43 @@ usage: (dbus-send-signal BUS SERVICE PATH INTERFACE SIGNAL &rest ARGS)  */)
 
   /* Return.  */
   return Qt;
+}
+
+/* Check, whether there is pending input in the message queue of the
+   D-Bus BUS.  BUS is a Lisp symbol, either :system or :session.  */
+int
+xd_get_dispatch_status (bus)
+     Lisp_Object bus;
+{
+  DBusConnection *connection;
+
+  /* Open a connection to the bus.  */
+  connection = xd_initialize (bus);
+
+  /* Non blocking read of the next available message.  */
+  dbus_connection_read_write (connection, 0);
+
+  /* Return.  */
+  return
+    (dbus_connection_get_dispatch_status (connection)
+     == DBUS_DISPATCH_DATA_REMAINS)
+    ? TRUE : FALSE;
+}
+
+/* Check for queued incoming messages from the system and session buses.  */
+int
+xd_pending_messages ()
+{
+
+  /* Vdbus_registered_functions_table will be initialized as hash
+     table in dbus.el.  When this package isn't loaded yet, it doesn't
+     make sense to handle D-Bus messages.  */
+  return (HASH_TABLE_P (Vdbus_registered_functions_table)
+	  ? (xd_get_dispatch_status (QCdbus_system_bus)
+	     || ((getenv ("DBUS_SESSION_BUS_ADDRESS") != NULL)
+		 ? xd_get_dispatch_status (QCdbus_session_bus)
+		 : FALSE))
+	  : FALSE);
 }
 
 /* Read queued incoming message of the D-Bus BUS.  BUS is a Lisp
@@ -1804,6 +1953,10 @@ used for composing the returning D-Bus message.  */)
 void
 syms_of_dbusbind ()
 {
+
+  Qdbus_init_bus = intern ("dbus-init-bus");
+  staticpro (&Qdbus_init_bus);
+  defsubr (&Sdbus_init_bus);
 
   Qdbus_get_unique_name = intern ("dbus-get-unique-name");
   staticpro (&Qdbus_get_unique_name);

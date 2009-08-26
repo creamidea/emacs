@@ -1,7 +1,8 @@
 ;;; vc-hooks.el --- resident support for version-control
 
 ;; Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 1999, 2000, 2001,
-;;   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+;;   2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+;;   Free Software Foundation, Inc.
 
 ;; Author:     FSF (see vc.el for full credits)
 ;; Maintainer: Andre Spiegel <spiegel@gnu.org>
@@ -204,6 +205,8 @@ individually should stay local."
 ;; Tell Emacs about this new kind of minor mode
 ;; (add-to-list 'minor-mode-alist '(vc-mode vc-mode))
 
+;; Autoload if this file no longer dumped.
+(put 'vc-mode 'risky-local-variable t)
 (make-variable-buffer-local 'vc-mode)
 (put 'vc-mode 'permanent-local t)
 
@@ -436,7 +439,8 @@ For registered files, the possible values are:
   "Return the name under which the user accesses the given FILE."
   (or (and (eq (string-match tramp-file-name-regexp file) 0)
            ;; tramp case: execute "whoami" via tramp
-           (let ((default-directory (file-name-directory file)))
+           (let ((default-directory (file-name-directory file))
+		 process-file-side-effects)
              (with-temp-buffer
                (if (not (zerop (process-file "whoami" nil t)))
                    ;; fall through if "whoami" didn't work

@@ -80,6 +80,14 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 extern int errno;
 #endif
 
+/* hash table read constants */
+Lisp_Object Qhash_table, Qdata;
+Lisp_Object Qtest, Qsize;
+Lisp_Object Qweakness;
+Lisp_Object Qrehash_size;
+Lisp_Object Qrehash_threshold;
+extern Lisp_Object QCtest, QCsize, QCrehash_size, QCrehash_threshold, QCweakness;
+
 Lisp_Object Qread_char, Qget_file_char, Qstandard_input, Qcurrent_load_list;
 Lisp_Object Qvariable_documentation, Vvalues, Vstandard_input, Vafter_load_alist;
 Lisp_Object Qascii_character, Qload, Qload_file_name;
@@ -99,9 +107,7 @@ extern Lisp_Object Qfile_exists_p;
 
 /* non-zero if inside `load' */
 int load_in_progress;
-
-/* Depth of nested `load' invocations.  */
-int load_depth;
+static Lisp_Object Qload_in_progress;
 
 /* Directory in which the sources were found.  */
 Lisp_Object Vsource_directory;
@@ -215,6 +221,10 @@ static Lisp_Object Vloads_in_progress;
 /* Non-zero means load dangerous compiled Lisp files.  */
 
 int load_dangerous_libraries;
+
+/* Non-zero means force printing messages when loading Lisp files.  */
+
+int force_load_messages;
 
 /* A regular expression used to detect files compiled with Emacs.  */
 
@@ -972,7 +982,8 @@ This function searches the directories in `load-path'.
 If optional second arg NOERROR is non-nil,
 report no error if FILE doesn't exist.
 Print messages at start and end of loading unless
-optional third arg NOMESSAGE is non-nil.
+optional third arg NOMESSAGE is non-nil (but `force-load-messages'
+overrides that).
 If optional fourth arg NOSUFFIX is non-nil, don't try adding
 suffixes `.elc' or `.el' to the specified name FILE.
 If optional fifth arg MUST-SUFFIX is non-nil, insist on
@@ -1166,7 +1177,7 @@ Return t if the file exists and loads successfully.  */)
 		  error ("File `%s' was not compiled in Emacs",
 			 SDATA (found));
 		}
-	      else if (!NILP (nomessage))
+	      else if (!NILP (nomessage) && !force_load_messages)
 		message_with_string ("File `%s' not compiled in Emacs", found, 1);
 	    }
 
@@ -1188,7 +1199,7 @@ Return t if the file exists and loads successfully.  */)
 	      newer = 1;
 
 	      /* If we won't print another message, mention this anyway.  */
-	      if (!NILP (nomessage))
+	      if (!NILP (nomessage) && !force_load_messages)
 		{
 		  Lisp_Object msg_file;
 		  msg_file = Fsubstring (found, make_number (0), make_number (-1));
@@ -1210,7 +1221,7 @@ Return t if the file exists and loads successfully.  */)
 	    emacs_close (fd);
 	  val = call4 (Vload_source_file_function, found, hist_file_name,
 		       NILP (noerror) ? Qnil : Qt,
-		       NILP (nomessage) ? Qnil : Qt);
+		       (NILP (nomessage) || force_load_messages) ? Qnil : Qt);
 	  return unbind_to (count, val);
 	}
     }
@@ -1233,7 +1244,7 @@ Return t if the file exists and loads successfully.  */)
   if (! NILP (Vpurify_flag))
     Vpreloaded_file_list = Fcons (file, Vpreloaded_file_list);
 
-  if (NILP (nomessage))
+  if (NILP (nomessage) || force_load_messages)
     {
       if (!safe_p)
 	message_with_string ("Loading %s (compiled; note unsafe, not compiled in Emacs)...",
@@ -1253,8 +1264,7 @@ Return t if the file exists and loads successfully.  */)
   specbind (Qinhibit_file_name_operation, Qnil);
   load_descriptor_list
     = Fcons (make_number (fileno (stream)), load_descriptor_list);
-  load_depth++;
-  load_in_progress = 1;
+  specbind (Qload_in_progress, Qt);
   if (! version || version >= 22)
     readevalloop (Qget_file_char, stream, hist_file_name,
 		  Feval, 0, Qnil, Qnil, Qnil, Qnil);
@@ -1283,7 +1293,7 @@ Return t if the file exists and loads successfully.  */)
   prev_saved_doc_string = 0;
   prev_saved_doc_string_size = 0;
 
-  if (!noninteractive && NILP (nomessage))
+  if (!noninteractive && (NILP (nomessage) || force_load_messages))
     {
       if (!safe_p)
 	message_with_string ("Loading %s (compiled; note unsafe, not compiled in Emacs)...done",
@@ -1316,8 +1326,6 @@ load_unwind (arg)  /* used as unwind-protect function in load */
       fclose (stream);
       UNBLOCK_INPUT;
     }
-  if (--load_depth < 0) load_depth = 0;
-  load_in_progress = load_depth > 0;
   return Qnil;
 }
 
@@ -2346,6 +2354,78 @@ read1 (readcharfun, pch, first_in_list)
 
     case '#':
       c = READCHAR;
+      if (c == 's')
+	{
+	  c = READCHAR;
+	  if (c == '(')
+	    {
+	      /* Accept extended format for hashtables (extensible to
+		 other types), e.g.
+		 #s(hash-table size 2 test equal data (k1 v1 k2 v2)) */
+	      Lisp_Object tmp = read_list (0, readcharfun);
+	      Lisp_Object head = CAR_SAFE (tmp);
+	      Lisp_Object data = Qnil;
+	      Lisp_Object val = Qnil;
+	      /* The size is 2 * number of allowed keywords to
+		 make-hash-table. */
+	      Lisp_Object params[10]; 
+	      Lisp_Object ht;
+	      Lisp_Object key = Qnil;
+	      int param_count = 0;
+	      int i;
+	      
+	      if (!EQ (head, Qhash_table))
+		error ("Invalid extended read marker at head of #s list "
+		       "(only hash-table allowed)");
+	      
+	      tmp = CDR_SAFE (tmp);
+
+	      /* This is repetitive but fast and simple. */
+	      params[param_count] = QCsize;
+	      params[param_count+1] = Fplist_get (tmp, Qsize);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      params[param_count] = QCtest;
+	      params[param_count+1] = Fplist_get (tmp, Qtest);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      params[param_count] = QCweakness;
+	      params[param_count+1] = Fplist_get (tmp, Qweakness);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      params[param_count] = QCrehash_size;
+	      params[param_count+1] = Fplist_get (tmp, Qrehash_size);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      params[param_count] = QCrehash_threshold;
+	      params[param_count+1] = Fplist_get (tmp, Qrehash_threshold);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      /* This is the hashtable data. */
+	      data = Fplist_get (tmp, Qdata);
+
+	      /* Now use params to make a new hashtable and fill it. */
+	      ht = Fmake_hash_table (param_count, params);
+	      
+	      while (CONSP (data))
+	      	{
+	      	  key = XCAR (data);
+	      	  data = XCDR (data);
+	      	  if (!CONSP (data))
+	      	    error ("Odd number of elements in hashtable data");
+	      	  val = XCAR (data);
+	      	  data = XCDR (data);
+	      	  Fputhash (key, val, ht);
+	      	}
+	      
+	      return ht;
+	    }
+	}
       if (c == '^')
 	{
 	  c = READCHAR;
@@ -4134,7 +4214,6 @@ init_lread ()
   Vvalues = Qnil;
 
   load_in_progress = 0;
-  load_depth = 0;
   Vload_file_name = Qnil;
 
   load_descriptor_list = Qnil;
@@ -4258,6 +4337,8 @@ customize `jka-compr-load-suffixes' rather than the present variable.  */);
 
   DEFVAR_BOOL ("load-in-progress", &load_in_progress,
 	       doc: /* Non-nil if inside of `load'.  */);
+  Qload_in_progress = intern ("load-in-progress");
+  staticpro (&Qload_in_progress);
 
   DEFVAR_LISP ("after-load-alist", &Vafter_load_alist,
 	       doc: /* An alist of expressions to be evalled when particular files are loaded.
@@ -4358,6 +4439,11 @@ incompatible byte codes can make Emacs crash when it tries to execute
 them.  */);
   load_dangerous_libraries = 0;
 
+  DEFVAR_BOOL ("force-load-messages", &force_load_messages,
+	       doc: /* Non-nil means force printing messages when loading Lisp files.
+This overrides the value of the NOMESSAGE argument to `load'.  */);
+  force_load_messages = 0;
+
   DEFVAR_LISP ("bytecomp-version-regexp", &Vbytecomp_version_regexp,
 	       doc: /* Regular expression matching safe to load compiled Lisp files.
 When Emacs loads a compiled Lisp file, it reads the first 512 bytes
@@ -4442,6 +4528,21 @@ to load.  See also `load-dangerous-libraries'.  */);
 
   Vloads_in_progress = Qnil;
   staticpro (&Vloads_in_progress);
+
+  Qhash_table = intern ("hash-table");
+  staticpro (&Qhash_table);
+  Qdata = intern ("data");
+  staticpro (&Qdata);
+  Qtest = intern ("test");
+  staticpro (&Qtest);
+  Qsize = intern ("size");
+  staticpro (&Qsize);
+  Qweakness = intern ("weakness");
+  staticpro (&Qweakness);
+  Qrehash_size = intern ("rehash-size");
+  staticpro (&Qrehash_size);
+  Qrehash_threshold = intern ("rehash-threshold");
+  staticpro (&Qrehash_threshold);
 }
 
 /* arch-tag: a0d02733-0f96-4844-a659-9fd53c4f414d

@@ -43,64 +43,64 @@
 ;; beginning of vc.el. The current status is:
 ;; ("??" means: "figure out what to do about it")
 ;;
-;; FUNCTION NAME                        STATUS
+;; FUNCTION NAME                                   STATUS
 ;; BACKEND PROPERTIES
-;; * revision-granularity                      OK
+;; * revision-granularity                          OK
 ;; STATE-QUERYING FUNCTIONS
-;; * registered (file)			   OK
-;; * state (file)				   OK
-;; - state-heuristic (file)			   NOT NEEDED
-;; * working-revision (file)		   OK
-;; - latest-on-branch-p (file)		   NOT NEEDED
-;; * checkout-model (files)		   OK
-;; - workfile-unchanged-p (file)		   OK
-;; - mode-line-string (file)			   OK
+;; * registered (file)                             OK
+;; * state (file)                                  OK
+;; - state-heuristic (file)                        NOT NEEDED
+;; * working-revision (file)                       OK
+;; - latest-on-branch-p (file)                     NOT NEEDED
+;; * checkout-model (files)                        OK
+;; - workfile-unchanged-p (file)                   OK
+;; - mode-line-string (file)                       OK
 ;; STATE-CHANGING FUNCTIONS
-;; * create-repo ()			   OK
-;; * register (files &optional rev comment)    OK
-;; - init-revision (file)			   NOT NEEDED
-;; - responsible-p (file)			   OK
-;; - could-register (file)			   NOT NEEDED, DEFAULT IS GOOD
-;; - receive-file (file rev)			   NOT NEEDED
-;; - unregister (file)			   OK
-;; * checkin (files rev comment)		   OK
-;; * find-revision (file rev buffer)		   OK
-;; * checkout (file &optional editable rev)	   OK
-;; * revert (file &optional contents-done)	   OK
-;; - rollback (files)			   COULD BE SUPPORTED
+;; * create-repo ()                                OK
+;; * register (files &optional rev comment)        OK
+;; - init-revision (file)                          NOT NEEDED
+;; - responsible-p (file)                          OK
+;; - could-register (file)                         NOT NEEDED, DEFAULT IS GOOD
+;; - receive-file (file rev)                       NOT NEEDED
+;; - unregister (file)                             OK
+;; * checkin (files rev comment)                   OK
+;; * find-revision (file rev buffer)               OK
+;; * checkout (file &optional editable rev)        OK
+;; * revert (file &optional contents-done)         OK
+;; - rollback (files)                              COULD BE SUPPORTED
 ;; - merge (file rev1 rev2)                   It would be possible to merge
 ;;                                          changes into a single file, but when
 ;;                                          committing they wouldn't
 ;;                                          be identified as a merge
 ;;                                          by git, so it's probably
 ;;                                          not a good idea.
-;; - merge-news (file)			   see `merge'
-;; - steal-lock (file &optional revision)	   NOT NEEDED
+;; - merge-news (file)                     see `merge'
+;; - steal-lock (file &optional revision)          NOT NEEDED
 ;; HISTORY FUNCTIONS
-;; * print-log (files &optional buffer)		   OK
-;; - log-view-mode ()				   OK
-;; - show-log-entry (revision)			   OK
-;; - comment-history (file)			   ??
-;; - update-changelog (files)			   COULD BE SUPPORTED
-;; * diff (file &optional rev1 rev2 buffer)	           OK
-;; - revision-completion-table (files)		   OK
-;; - annotate-command (file buf &optional rev)	   OK
-;; - annotate-time ()				   OK
-;; - annotate-current-time ()			   NOT NEEDED
-;; - annotate-extract-revision-at-line ()	           OK
+;; * print-log (files &optional buffer shortlog)   OK
+;; - log-view-mode ()                              OK
+;; - show-log-entry (revision)                     OK
+;; - comment-history (file)                        ??
+;; - update-changelog (files)                      COULD BE SUPPORTED
+;; * diff (file &optional rev1 rev2 buffer)        OK
+;; - revision-completion-table (files)             OK
+;; - annotate-command (file buf &optional rev)     OK
+;; - annotate-time ()                              OK
+;; - annotate-current-time ()                      NOT NEEDED
+;; - annotate-extract-revision-at-line ()          OK
 ;; TAG SYSTEM
-;; - create-tag (dir name branchp)	   OK
-;; - retrieve-tag (dir name update)	   OK, needs to update buffers
+;; - create-tag (dir name branchp)                 OK
+;; - retrieve-tag (dir name update)                OK
 ;; MISCELLANEOUS
-;; - make-version-backups-p (file)	   NOT NEEDED
-;; - repository-hostname (dirname)	   NOT NEEDED
-;; - previous-revision (file rev)		   OK
-;; - next-revision (file rev)		   OK
-;; - check-headers ()			   COULD BE SUPPORTED
-;; - clear-headers ()			   NOT NEEDED
-;; - delete-file (file)			   OK
-;; - rename-file (old new)		   OK
-;; - find-file-hook ()			   NOT NEEDED
+;; - make-version-backups-p (file)                 NOT NEEDED
+;; - repository-hostname (dirname)                 NOT NEEDED
+;; - previous-revision (file rev)                  OK
+;; - next-revision (file rev)                      OK
+;; - check-headers ()                              COULD BE SUPPORTED
+;; - clear-headers ()                              NOT NEEDED
+;; - delete-file (file)                            OK
+;; - rename-file (old new)                         OK
+;; - find-file-hook ()                             NOT NEEDED
 
 (eval-when-compile
   (require 'cl)
@@ -146,7 +146,8 @@ If nil, use the value of `vc-diff-switches'.  If t, use no switches."
   "Check whether FILE is registered with git."
   (when (vc-git-root file)
     (with-temp-buffer
-      (let* ((dir (file-name-directory file))
+      (let* (process-file-side-effects
+	     (dir (file-name-directory file))
              (name (file-relative-name file dir))
              (str (ignore-errors
                     (when dir (cd dir))
@@ -183,9 +184,10 @@ If nil, use the value of `vc-diff-switches'.  If t, use no switches."
 
 (defun vc-git-working-revision (file)
   "Git-specific version of `vc-working-revision'."
-  (let ((str (with-output-to-string
-               (with-current-buffer standard-output
-                 (vc-git--out-ok "symbolic-ref" "HEAD")))))
+  (let* (process-file-side-effects
+	 (str (with-output-to-string
+		(with-current-buffer standard-output
+		  (vc-git--out-ok "symbolic-ref" "HEAD")))))
     (if (string-match "^\\(refs/heads/\\)?\\(.+\\)$" str)
         (match-string 2 str)
       str)))
@@ -260,7 +262,7 @@ If nil, use the value of `vc-diff-switches'.  If t, use no switches."
 
 (defun vc-git-rename-as-string (state extra)
   "Return a string describing the copy or rename associated with INFO, or an empty string if none."
-  (let ((rename-state (when extra 
+  (let ((rename-state (when extra
 			(vc-git-extra-fileinfo->rename-state extra))))
     (if rename-state
         (propertize
@@ -406,7 +408,7 @@ If nil, use the value of `vc-diff-switches'.  If t, use no switches."
     (when (string= stash "") (setq stash "Nothing stashed"))
     (concat
      (propertize "Branch     : " 'face 'font-lock-type-face)
-     (propertize 
+     (propertize
       (if (string-match "^\\(refs/heads/\\)?\\(.+\\)$" str)
 	  (match-string 2 str)
 	"not (detached HEAD)")
@@ -424,8 +426,16 @@ If nil, use the value of `vc-diff-switches'.  If t, use no switches."
   (vc-git-command nil 0 nil "init"))
 
 (defun vc-git-register (files &optional rev comment)
-  "Register FILE into the git version-control system."
-  (vc-git-command nil 0 files "update-index" "--add" "--"))
+  "Register FILES into the git version-control system."
+  (let (flist dlist)
+    (dolist (crt files)
+      (if (file-directory-p crt)
+	  (push crt dlist)
+	(push crt flist)))
+    (when flist
+      (vc-git-command nil 0 flist "update-index" "--add" "--"))
+    (when dlist
+      (vc-git-command nil 0 dlist "add"))))
 
 (defalias 'vc-git-responsible-p 'vc-git-root)
 
@@ -436,15 +446,16 @@ If nil, use the value of `vc-diff-switches'.  If t, use no switches."
 (defun vc-git-checkin (files rev comment)
   (let ((coding-system-for-write git-commits-coding-system))
     (vc-git-command nil 0 files "commit"
-		    (if vc-git-add-signoff "-s" "") "-m" comment "--only" "--")))
+		    (if vc-git-add-signoff "-s") "-m" comment "--only" "--")))
 
 (defun vc-git-find-revision (file rev buffer)
-  (let ((coding-system-for-read 'binary)
-        (coding-system-for-write 'binary)
-	(fullname (substring
-		   (vc-git--run-command-string
-		    file "ls-files" "-z" "--full-name" "--")
-		   0 -1)))
+  (let* (process-file-side-effects
+	 (coding-system-for-read 'binary)
+	 (coding-system-for-write 'binary)
+	 (fullname (substring
+		    (vc-git--run-command-string
+		     file "ls-files" "-z" "--full-name" "--")
+		    0 -1)))
     (vc-git-command
      buffer 0
      (concat (if rev rev "HEAD") ":" fullname) "cat-file" "blob")))
@@ -528,15 +539,17 @@ or BRANCH^ (where \"^\" can be repeated)."
 
 (defun vc-git-diff (files &optional rev1 rev2 buffer)
   "Get a difference report using Git between two revisions of FILES."
-  (apply #'vc-git-command (or buffer "*vc-diff*") 1 files
-	 (if (and rev1 rev2) "diff-tree" "diff-index")
-	 "--exit-code"
-	 (append (vc-switches 'git 'diff)
-		 (list "-p" (or rev1 "HEAD") rev2 "--"))))
+  (let (process-file-side-effects)
+    (apply #'vc-git-command (or buffer "*vc-diff*") 1 files
+	   (if (and rev1 rev2) "diff-tree" "diff-index")
+	   "--exit-code"
+	   (append (vc-switches 'git 'diff)
+		   (list "-p" (or rev1 "HEAD") rev2 "--")))))
 
 (defun vc-git-revision-table (files)
   ;; What about `files'?!?  --Stef
-  (let ((table (list "HEAD")))
+  (let (process-file-side-effects
+	(table (list "HEAD")))
     (with-temp-buffer
       (vc-git-command t nil nil "for-each-ref" "--format=%(refname)")
       (goto-char (point-min))
@@ -553,7 +566,7 @@ or BRANCH^ (where \"^\" can be repeated)."
 
 (defun vc-git-annotate-command (file buf &optional rev)
   (let ((name (file-relative-name file)))
-    (vc-git-command buf 0 name "blame" rev)))
+    (vc-git-command buf 'async name "blame" "--date=iso" rev)))
 
 (declare-function vc-annotate-convert-time "vc-annotate" (time))
 
@@ -649,6 +662,12 @@ or BRANCH^ (where \"^\" can be repeated)."
     (define-key map [git-grep]
       '(menu-item "Git grep..." vc-git-grep
 		  :help "Run the `git grep' command"))
+    (define-key map [git-st]
+      '(menu-item "Stash..." vc-git-stash
+		  :help "Stash away changes"))
+    (define-key map [git-ss]
+      '(menu-item "Show Stash..." vc-git-stash-show
+		  :help "Show stash contents"))
     (define-key map [git-sig]
       '(menu-item "Add Signed-off-by on commit" vc-git-toggle-signoff
 	      :help "Add Add Signed-off-by when commiting (i.e. add the -s flag)"
@@ -717,6 +736,24 @@ This command shares argument histories with \\[rgrep] and \\[grep]."
 	(if (eq next-error-last-buffer (current-buffer))
 	    (setq default-directory dir))))))
 
+(defun vc-git-stash (name)
+  "Create a stash."
+  (interactive "sStash name: ")
+  (let ((root (vc-git-root default-directory)))
+    (when root
+      (vc-git--call nil "stash" "save" name)
+      (vc-resynch-buffer root t t))))
+
+(defun vc-git-stash-show (name)
+  "Show the contents of stash NAME."
+  (interactive "sStash name: ")
+  (vc-setup-buffer "*vc-git-stash*")
+  (vc-git-command "*vc-git-stash*" 'async nil "stash" "show" "-p" name)
+  (set-buffer "*vc-git-stash*")
+  (diff-mode)
+  (setq buffer-read-only t)
+  (pop-to-buffer (current-buffer)))
+
 (defun vc-git-stash-list ()
   (replace-regexp-in-string
    "\n" "\n             "
@@ -736,7 +773,8 @@ The difference to vc-do-command is that this function always invokes `git'."
 
 (defun vc-git--empty-db-p ()
   "Check if the git db is empty (no commit done yet)."
-  (not (eq 0 (vc-git--call nil "rev-parse" "--verify" "HEAD"))))
+  (let (process-file-side-effects)
+    (not (eq 0 (vc-git--call nil "rev-parse" "--verify" "HEAD")))))
 
 (defun vc-git--call (buffer command &rest args)
   ;; We don't need to care the arguments.  If there is a file name, it

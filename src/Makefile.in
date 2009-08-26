@@ -63,6 +63,8 @@ M_FILE = ${srcdir}/@machfile@
 S_FILE = ${srcdir}/@opsysfile@
 config_h = config.h $(M_FILE) $(S_FILE)
 
+bootstrap_exe = ../src/bootstrap-emacs${EXEEXT}
+
 # ========================== start of cpp stuff =======================
 /* From here on, comments must be done in C syntax.  */
 
@@ -907,13 +909,14 @@ emacs${EXEEXT}: temacs${EXEEXT} ${etc}DOC ${lisp} ${SOME_MACHINE_LISP}
 #ifdef CANNOT_DUMP
 	rm -f emacs${EXEEXT}
 	ln temacs${EXEEXT} emacs${EXEEXT}
+	-EMACSLOADPATH=${lispsource} ./emacs -q -batch -f list-load-path-shadows
 #else
 	LC_ALL=C $(RUN_TEMACS) -batch -l loadup dump
 	@: This new Emacs is as functional and more efficient then
 	@: bootstrap-emacs, so let us replace it.
 	-ln -f emacs${EXEEXT} bootstrap-emacs${EXEEXT}
-#endif /* ! defined (CANNOT_DUMP) */
 	-./emacs -q -batch -f list-load-path-shadows
+#endif /* ! defined (CANNOT_DUMP) */
 
 /* We run make-docfile twice because the command line may get too long
    on some systems.  */
@@ -936,8 +939,10 @@ ${etc}DOC: ${libsrc}make-docfile${EXEEXT} ${obj} ${lisp} ${SOME_MACHINE_LISP}
 ${libsrc}make-docfile${EXEEXT}:
 	cd ${libsrc}; ${MAKE} ${MFLAGS} make-docfile${EXEEXT}
 
+buildobj.h: Makefile
+	echo "#define BUILDOBJ \"${obj} ${otherobj} " OBJECTS_MACHINE "\"" > buildobj.h
+
 temacs${EXEEXT}: $(LOCALCPP) $(STARTFILES) stamp-oldxmenu ${obj} ${otherobj} OBJECTS_MACHINE prefix-args${EXEEXT}
-	echo "${obj} ${otherobj} " OBJECTS_MACHINE > buildobj.lst
 #ifdef NS_IMPL_GNUSTEP
 	$(CC) -rdynamic YMF_PASS_LDFLAGS ( ${TEMACS_LDFLAGS} \
 	-L@GNUSTEP_SYSTEM_LIBRARIES@ -lgnustep-gui -lgnustep-base \
@@ -1062,7 +1067,8 @@ dispnew.o: dispnew.c systime.h commands.h process.h frame.h \
    disptab.h indent.h $(INTERVALS_H) \
    xterm.h blockinput.h atimer.h character.h msdos.h composite.h keyboard.h \
    syssignal.h $(config_h)
-doc.o: doc.c $(config_h) epaths.h buffer.h keyboard.h keymap.h character.h
+doc.o: doc.c $(config_h) epaths.h buffer.h keyboard.h keymap.h character.h \
+   buildobj.h
 doprnt.o: doprnt.c character.h $(config_h)
 dosfns.o: buffer.h termchar.h termhooks.h frame.h blockinput.h window.h \
    msdos.h dosfns.h dispextern.h charset.h coding.h atimer.h systime.h \
@@ -1284,7 +1290,7 @@ mostlyclean:
 	rm -f temacs${EXEEXT} prefix-args${EXEEXT} core *.core \#* *.o libXMenu11.a liblw.a
 	rm -f ../etc/DOC
 	rm -f bootstrap-emacs${EXEEXT} emacs-${version}${EXEEXT}
-	rm -f buildobj.lst
+	rm -f buildobj.h
 clean: mostlyclean
 	rm -f emacs-*.*.*${EXEEXT} emacs${EXEEXT}
 #ifdef HAVE_NS
@@ -1364,13 +1370,13 @@ tags: TAGS TAGS-LISP $(lwlibdir)TAGS
    With GNU Make, we would just say "%.el : %.elc $(BOOTSTRAPEMACS)"  */
 .el.elc:
 	@cd ../lisp; $(MAKE) $(MFLAGS) compile-onefile \
-	                     THEFILE=$< EMACS=../src/bootstrap-emacs${EXEEXT}
+	                     THEFILE=$< EMACS=${bootstrap_exe}
 
 /* Since the .el.elc rule cannot specify an extra dependency, we do it here.  */
 ${lisp} ${SOME_MACHINE_LISP}: $(BOOTSTRAPEMACS)
 
 ${lispsource}loaddefs.el: $(BOOTSTRAPEMACS)
-	cd ../lisp; $(MAKE) $(MFLAGS) autoloads EMACS=../src/bootstrap-emacs${EXEEXT}
+	cd ../lisp; $(MAKE) $(MFLAGS) autoloads EMACS=${bootstrap_exe}
 
 /* Dump an Emacs executable named bootstrap-emacs containing the
    files from loadup.el in source form.  */
@@ -1384,4 +1390,4 @@ bootstrap-emacs${EXEEXT}: temacs${EXEEXT}
 	mv -f emacs${EXEEXT} bootstrap-emacs${EXEEXT}
 #endif /* ! defined (CANNOT_DUMP) */
 	@: Compile some files earlier to speed up further compilation.
-	cd ../lisp; $(MAKE) $(MFLAGS) compile-first EMACS=../src/bootstrap-emacs${EXEEXT}
+	cd ../lisp; $(MAKE) $(MFLAGS) compile-first EMACS=${bootstrap_exe}

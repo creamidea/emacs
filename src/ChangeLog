@@ -1,3 +1,264 @@
+2009-08-26  Ken Raeburn  <raeburn@raeburn.org>
+
+	* Makefile.in (buildobj.h): New target.
+	(doc.o): Depend on it.
+	(temacs${EXEEXT}): Don't generate buildobj.lst.
+	(mostlyclean): Delete buildobj.h, not buildobj.lst.
+	* makefile.w32-in ($(SRC)/buildobj.h): New target.
+	($(BLD)/doc.$(O)): Depend on it.
+	(make-buildobj-CMD, make-buildobj-SH): New targets.  (Syntax help
+	provided by Eli Zaretskii.)
+	($(TEMACS)): Don't generate buildobj.lst.
+	* doc.c: Include buildobj.h.
+	(buildobj): New static variable.
+	(Fsnarf_documentation): Use it, instead of opening and reading
+	buildobj.lst.
+
+2009-08-25  Michael Albinus  <michael.albinus@gmx.de>
+
+	* dbusbind.c (Fdbus_call_method)
+	(Fdbus_call_method_asynchronously): Use English numeric format for
+	timeout values in doc string.
+
+2009-08-25  Kenichi Handa  <handa@m17n.org>
+
+	* lisp.h (CHAR_TABLE_REF_ASCII): New macro.
+	(CHAR_TABLE_REF): Use it.
+
+2009-08-23  Ken Raeburn  <raeburn@raeburn.org>
+
+	* Makefile.in (emacs${EXEEXT}) [CANNOT_DUMP]: Set EMACSLOADPATH
+	before invoking the newly build emacs to check for load-path
+	shadowing.
+
+2009-08-22  Glenn Morris  <rgm@gnu.org>
+
+	* Makefile.in (bootstrap_exe): New variable.
+	(.el.elc, ${lispsource}loaddefs.el, bootstrap-emacs${EXEEXT}):
+	Use ${bootstrap_exe}.
+
+2009-08-22  Eli Zaretskii  <eliz@gnu.org>
+
+	* coding.h (encode_coding_string): Don't encode unibyte strings.
+	(Bug#4047)
+
+2009-08-22  Michael Albinus  <michael.albinus@gmx.de>
+
+	* config.in (HAVE_DBUS_WATCH_GET_UNIX_FD): Add.
+
+	* dbusbind.c (XD_WITH_DBUS_WATCH_GET_UNIX_FD): Remove.  It was
+	intended as hotfix only.
+	(xd_add_watch, xd_remove_watch): Use HAVE_DBUS_WATCH_GET_UNIX_FD.
+
+2009-08-21  Adrian Robert  <Adrian.B.Robert@gmail.com>
+
+	* nsterm.m (ns_get_color): Update documentation properly for last
+	change, and clean up loose ends in the code left by it.  Fix
+	longstanding bug with 16-bit hex parsing, and add support for
+	yet another X11 format (rgb:r/g/b) for compatibility.
+	* nsfns.m (EmacsDialogPanel-runDialogAt): Add declaration of
+	timer_check() to avoid crash on Leopard/PPC.  Bug #2154.
+
+2009-08-21  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* eval.c (init_eval_once): Bump max_lisp_eval_depth to 500 for js.el.
+
+2009-08-20  Michael Albinus  <michael.albinus@gmx.de>
+
+	* dbusbind.c (XD_WITH_DBUS_WATCH_GET_UNIX_FD): New macro.
+	(xd_add_watch, xd_remove_watch): Use it.  Print debug messages.
+	(xd_initialize, xd_pending_messages): Check, whether
+	$DBUS_SESSION_BUS_ADDRESS is set.
+
+2009-08-20  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* nsfns.m (Fxw_color_values): Return 3-element list.  Doc fix.
+
+	* nsterm.m (ns_get_color): Remove incompatible color formats again.
+
+2009-08-20  Glenn Morris  <rgm@gnu.org>
+
+	* emacs.c (system-type): Doc fix.
+
+2009-08-19  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* keyboard.c (syms_of_keyboard): Default to 5 buttons, which should be
+	enough for the most common situations.  Avoid SET_SYMBOL_VALUE.
+
+2009-08-18  Michael Albinus  <michael.albinus@gmx.de>
+
+	* dbusbind.c (xd_add_watch, xd_remove_watch, Fdbus_init_bus):
+	New functions.
+	(xd_initialize): Revert change from 2009-08-16.
+
+2009-08-18  Kenichi Handa  <handa@m17n.org>
+
+	* fontset.c (Ffontset_font): If a nil element is found in a
+	font-group vector, return nil.
+
+2009-08-17  Chong Yidong  <cyd@stupidchicken.com>
+
+	* process.c (status_notify): Don't perform redisplay.
+	(Fdelete_process, list_processes_1, process_send_signal):
+	Expliticly perform redisplay.
+	(wait_reading_process_output): Always check process status, but
+	don't perform redisplay unless DO_DISPLAY is non-zero (Bug#2930).
+
+2009-08-17  Ken Raeburn  <raeburn@raeburn.org>
+
+	* lisp.h (XFLOAT_DATA): Produce an rvalue by adding 0 to the value.
+	(XFLOAT_INIT): New macro for storing a float value.
+	* alloc.c (make_float, make_pure_float): Use XFLOAT_INIT.
+	* fns.c (sxhash): Copy out the value of a float in order to
+	examine its bytes.
+	* dbusbind.c (xd_append_arg): Likewise.
+
+	* emacs.c (main): Don't call syms_of_data twice.
+
+2009-08-16  Michael Albinus  <michael.albinus@gmx.de>
+
+	* dbusbind.c (xd_initialize): Add connection file descriptor to
+	input_wait_mask, in order to let select() detect, whether a new
+	message has been arrived.
+	(Fdbus_call_method_asynchronously): Allow nil HANDLER.
+
+2009-08-15  Michael Albinus  <michael.albinus@gmx.de>
+
+	* dbusbind.c (xd_get_dispatch_status, xd_pending_messages):
+	New functions.
+
+	* lisp.h (xd_pending_messages): Declare.
+
+	* keyboard.c (readable_events): Call xd_pending_messages.
+
+2009-08-15  Chong Yidong  <cyd@stupidchicken.com>
+
+	* eval.c (Fcalled_interactively_p, Finteractive_p): Doc fix (Bug#3936).
+
+	* xdisp.c (pop_it): Don't pop into a display vector (Bug#4131).
+
+	* buffer.c (set_buffer_internal_1)
+	(swap_out_buffer_local_variables): Check for unbound local
+	variables (Bug#4138).
+
+2009-08-14  Eli Zaretskii  <eliz@gnu.org>
+
+	* process.c (create_pty): Fix last change.
+
+2009-08-13  Chong Yidong  <cyd@stupidchicken.com>
+
+	* image.c (xbm_read_bitmap_data): New arg inhibit_image_error.
+	(xbm_load_image): Caller changed.
+	(xbm_file_p): Avoid signalling an image_error (Bug#4107).
+
+2009-08-13  Nick Roberts  <nickrob@snap.net.nz>
+
+	* process.c (create_pty): New function.
+	(Fstart_process): Use it to allow Emacs to just associate a pty
+	with the buffer.  See associated change in gdb-mi.el.
+	(list_processes_1): Deal with no program name.
+	(start_process_unwind): Use pid == -2 to mean no process.
+
+2009-08-12  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* cmds.c (nonundocount): New global variable.
+	(keys_of_cmds): Initialize it.
+	(Fself_insert_command): Use it to combine upto 20 sequential chars
+	into a single undo entry, just like the Qself_insert_command code in
+	keyboard.c does.
+	Call frame_make_pointer_invisible, also like the Qself_insert_command
+	code in keyboard.c does.
+	* keyboard.c (command_loop_1): Use the new global nonundocount rather
+	than its own local replacement for it.
+
+2009-08-10  Ken Raeburn  <raeburn@raeburn.org>
+
+	* fns.c (concat): Don't re-set string length to its current value.
+
+	* coding.h (decode_coding_string, encode_coding_string):
+	Use SBYTES macro.
+
+	* doprnt.c (doprnt_lisp): Delete unused function.
+	(doprnt): Merge with doprnt1, discarding lispstrings code.
+	* lisp.h (doprnt_lisp): Don't declare.
+
+2009-08-07  Juri Linkov  <juri@jurta.org>
+
+	* puresize.h (BASE_PURESIZE): Increase to 1270000.
+
+2009-08-07  Dan Nicolaescu  <dann@ics.uci.edu>
+
+	* print.c (syms_of_print): Undo previous change.
+
+2009-08-05  Teodor Zlatanov  <tzz@lifelogs.com>
+
+	* lread.c (read1, syms_of_lread): Read hashtables back from the
+	readable format.
+
+	* print.c (print_preprocess, print_object): Print hashtables fully
+	and readably.
+	(syms_of_print): Provide 'hashtable-print-readable.
+
+2009-08-02  Adrian Robert  <Adrian.B.Robert@gmail.com>
+
+	* nsfont.m (ns_descriptor_to_entity): Handle case when descriptor has
+	no family set.
+	(nsfont_open): Handle case when entity has no family.
+
+2009-07-29  Adrian Robert  <Adrian.B.Robert@gmail.com>
+
+	* nsfont.m (ns_findfonts): Fix 2009-07-24 change to return only one
+	element, not a list, for match case.
+
+2009-07-28  Kenichi Handa  <handa@m17n.org>
+
+	* font.c (font_parse_xlfd): Check DPI and AVGWIDTH properties more
+	rigidly.
+
+	* xfont.c (xfont_list_pattern): Don't ignore the return value of
+	font_parse_xlfd.  Check font properties more rigidly.
+
+2009-07-27  Dan Nicolaescu  <dann@ics.uci.edu>
+
+	* s/netbsd.h (SIGNALS_VIA_CHARACTERS): Remove, already defined in bsd-common.h
+
+2009-07-27  Kenichi Handa  <handa@m17n.org>
+
+	* xfaces.c (face_with_height): Call font_clear_prop.
+
+2009-07-26  Chong Yidong  <cyd@stupidchicken.com>
+
+	* dispnew.c (init_display): Use Qx, Qw32, and Qns.
+
+	* xterm.c (x_term_init): Use Qx.
+
+	* nsfont.m (nsfont_draw): Revert 2009-07-15 change.
+
+	* nsterm.m (ns_maybe_dumpglyphs_background): Revert 2009-07-15 change.
+	(ns_get_color): Revert 2009-07-16 change.
+
+2009-07-25  Eli Zaretskii  <eliz@gnu.org>
+
+	* lread.c (syms_of_lread) <force_load_messages>: New variable.
+	(Fload): Use it to force load messages, even if NOMESSAGES is non-nil.
+
+2009-07-25  Ken Raeburn  <raeburn@raeburn.org>
+
+	* coding.h (decode_coding_string, encode_coding_string):
+	Use SCHARS macro.
+
+	* lread.c: Rewrite 2009-07-21 changes.
+	(load_depth): Delete.
+	(Qload_in_progress): New variable.
+	(load_unwind): Don't reference load_depth or load_in_progress.
+	(Fload): Likewise; specbind Qload_in_progress instead.
+	(init_lread): Don't initialize load_depth.
+	(syms_of_lread): Initialize and protect Qload_in_progress.
+
+2009-07-24  Adrian Robert  <Adrian.B.Robert@gmail.com>
+
+	* nsfont.m (ns_findfonts): Correctly return fallback in match case.
+
 2009-07-23  Yavor Doganov  <yavor@gnu.org>
 
 	* nsfont.m (NSFontDescriptor.h): Explicitly include under GNUstep.
@@ -13,8 +274,8 @@
 
 2009-07-22  Jason Rumney  <jasonr@gnu.org>
 
-	* w32fns.c (w32_wnd_proc) [WM_IME_STARTCOMPOSITION]: Position
-	IME window at cursor (Bug#2570).
+	* w32fns.c (w32_wnd_proc) [WM_IME_STARTCOMPOSITION]:
+	Position IME window at cursor (Bug#2570).
 	(w32_wnd_proc) [WM_IME_CHAR]: Release context when finished.
 	(globals_of_w32fns): Dynamically load functions required above.
 
@@ -90,16 +351,15 @@
 	(font_delete_unmatched): Likewise.
 	(font_list_entities): The return type changed.
 	(font_select_entity): The format of the second argument changed.
-	(font_find_for_lface): Adjusted for the above changes.  Don't
-	suppress the checking of C even if the repertory supports it.
-	(Flist_fonts): Adjusted for the above changes.
+	(font_find_for_lface): Adjuste for the above changes.
+	Don't suppress the checking of C even if the repertory supports it.
+	(Flist_fonts): Adjust for the above changes.
 
-	* ftfont.c (ftfont_spec_pattern): New arg langname.  Caller
-	changed.
-	(ftfont_list): Adjusted for the change of ftfont_spec_pattern.
+	* ftfont.c (ftfont_spec_pattern): New arg langname.  Change caller.
+	(ftfont_list): Adjust for the change of ftfont_spec_pattern.
 	Reject a font who has adstyle property that is different from a
 	langname derived from registry property.
-	(ftfont_match): Adjusted for the change of ftfont_spec_pattern.
+	(ftfont_match): Adjust for the change of ftfont_spec_pattern.
 
 2009-07-13  Eli Zaretskii  <eliz@gnu.org>
 
@@ -116,10 +376,10 @@
 
 2009-07-11  Eli Zaretskii  <eliz@gnu.org>
 
-	* dired.c (directory_files_internal_w32_unwind) [WINDOWSNT]: New
-	function.
-	(directory_files_internal) [WINDOWSNT]: Bind
-	w32-get-true-file-attributes to either t or nil, depending whether
+	* dired.c (directory_files_internal_w32_unwind) [WINDOWSNT]:
+	New function.
+	(directory_files_internal) [WINDOWSNT]:
+	Bind w32-get-true-file-attributes to either t or nil, depending whether
 	the filesystem of the directory is fast or slow.
 
 	* w32.c (logon_network_drive): Don't assume PATH is an absolute
@@ -141,8 +401,7 @@
 
 2009-07-09  Eli Zaretskii  <eliz@gnu.org>
 
-	* w32proc.c (syms_of_ntproc) <w32-get-true-file-attributes>: Doc
-	fix.
+	* w32proc.c (syms_of_ntproc) <w32-get-true-file-attributes>: Doc fix.
 
 	* w32.c (stat): Treat UNC file names as residing on remote
 	drives.  (Bug#3542)
@@ -193,8 +452,7 @@
 	(multibyte_char_to_unibyte_safe): Likewise.
 	(Funibyte_char_to_multibyte): Don't check charset_unibyte.
 
-	* xdisp.c (get_next_display_element): Decode it->c by
-	charset_unibyte.
+	* xdisp.c (get_next_display_element): Decode it->c by charset_unibyte.
 	(x_produce_glyphs): Likewise.
 
 	* .gdbinit (xcharset): Fix the treating $arg0.
@@ -254,8 +512,8 @@
 	(read_avail_input): Call frame_make_pointer_visible.
 
 	* frame.c (Vmake_pointer_invisible): New variable.
-	(frame_make_pointer_invisible, frame_make_pointer_visible): New
-	functions.
+	(frame_make_pointer_invisible, frame_make_pointer_visible):
+	New functions.
 	(syms_of_frame): DEFVAR make-pointer-invisible, initialize to Qt.
 
 	* frame.h: Declare frame_make_pointer_invisible and
@@ -274,7 +532,7 @@
 
 	* gtkutil.c (xg_frame_set_char_size): Do not set pixel width/height
 	here or	call change_frame_size. Just call flush_and_sync.
-	(flush_and_sync): Reintroduced.
+	(flush_and_sync): Reintroduce.
 
 2009-07-01  Jan Djärv  <jan.h.d@swipnet.se>
 
@@ -311,8 +569,8 @@
 	(x_set_font, x_figure_window_size): Do not handle fullscreen specially.
 	(syms_of_frame): Initialize Qmaximized.
 
-	* frame.h (fullscreen_type): Add FULLSCREEN_MAXIMIZED.  Declare
-	Qfullwidth, Qfullheight, Qfullboth, Qmaximized.
+	* frame.h (fullscreen_type): Add FULLSCREEN_MAXIMIZED.
+	Declare Qfullwidth, Qfullheight, Qfullboth, Qmaximized.
 
 	* xterm.c (handle_one_xevent): Remove call to x_check_fullscreen
 	for Expose event. Add call to x_check_fullscreen for MapNotify event.
@@ -330,8 +588,8 @@
 	flush_and_sync.
 	(xg_height_changed): New function.
 	(xg_create_frame_widgets): Remove call to gtk_widget_set_size_request
-	and gtk_window_set_policy.  Set frame gravity after parsing the geometry
-	string.
+	and gtk_window_set_policy.  Set frame gravity after parsing the
+	geometry string.
 	(xg_update_frame_menubar, free_frame_menubar)
 	(xg_tool_bar_detach_callback, xg_tool_bar_attach_callback)
 	(update_frame_tool_bar, free_frame_tool_bar): Call xg_height_changed.
@@ -342,8 +600,8 @@
 	* keyboard.c (decode_keyboard_code): New function.
 	(tty_read_avail_input): Decode the input bytes if necessary.
 
-	* coding.c (setup_coding_system): Initialize
-	coding->carryover_bytes to 0.
+	* coding.c (setup_coding_system):
+	Initialize coding->carryover_bytes to 0.
 	(Fset_keyboard_coding_system_internal): If CODING-SYSTEM is nil,
 	use Qno_conversion.
 
@@ -353,8 +611,7 @@
 
 2009-06-30  Chong Yidong  <cyd@stupidchicken.com>
 
-	* xftfont.c (xftfont_open): Avoid passing NULL argument to
-	XftLockFace.
+	* xftfont.c (xftfont_open): Avoid passing NULL argument to XftLockFace.
 
 2009-06-30  Jason Rumney  <jasonr@gnu.org>
 
@@ -386,8 +643,8 @@
 
 	* xdisp.c (start_display, handle_face_prop)
 	(move_it_vertically_backward, cursor_row_fully_visible_p)
-	(redisplay_window, try_window_id, produce_image_glyph): Delete
-	some #ifdef-ed out code chunks that are now obsolete.
+	(redisplay_window, try_window_id, produce_image_glyph):
+	Delete some #ifdef-ed out code chunks that are now obsolete.
 
 	* xterm.c (x_update_window_begin, x_new_focus_frame)
 	(x_scroll_bar_handle_click, handle_one_xevent)
@@ -459,8 +716,8 @@
 
 2009-06-23  Jim Meyering  <meyering@redhat.com>
 
-	* src/ftfont.c (setup_otf_gstring, ftfont_shape_by_flt): Use
-	xmalloc and xrealloc (not malloc and realloc), so subsequent heap
+	* src/ftfont.c (setup_otf_gstring, ftfont_shape_by_flt):
+	Use xmalloc and xrealloc (not malloc and realloc), so subsequent heap
 	pointer dereferences are guaranteed to be valid.
 
 2009-06-23  Kenichi Handa  <handa@m17n.org>
@@ -514,8 +771,7 @@
 
 2009-06-21  Chong Yidong  <cyd@stupidchicken.com>
 
-	* xdisp.c (IT_DISPLAYING_WHITESPACE): Define for
-	!HAVE_WINDOW_SYSTEM.
+	* xdisp.c (IT_DISPLAYING_WHITESPACE): Define for !HAVE_WINDOW_SYSTEM.
 	(move_it_in_display_line_to, move_it_in_display_line_to)
 	(display_line): Remove #ifdef HAVE_WINDOW_SYSTEM.
 
@@ -544,8 +800,7 @@
 
 2009-06-18  Kenichi Handa  <handa@m17n.org>
 
-	* coding.c (decode_coding_iso_2022): Check MSB of bytes more
-	rigidly.
+	* coding.c (decode_coding_iso_2022): Check MSB of bytes more rigidly.
 
 2009-06-18  Andreas Schwab  <aschwab@redhat.com>
 
@@ -669,8 +924,7 @@
 
 2009-06-08 Felix Mueller  <felix@enqueue.eu>  (tiny change)
 
-	* nsterm.m (ns_init_paths): Append path separator to INFOPATH
-	variable.
+	* nsterm.m (ns_init_paths): Append path separator to INFOPATH variable.
 
 2009-06-08  Wolfgang Lux  <wolfgang.lux@gmail.com>  (tiny change)
 
@@ -695,8 +949,8 @@
 
 2009-05-29  Kenichi Handa  <handa@m17n.org>
 
-	* coding.c (get_translation_table): Check
-	Venable_character_translation.
+	* coding.c (get_translation_table):
+	Check Venable_character_translation.
 
 2009-05-26  David Reitter  <david.reitter@gmail.com>
 
@@ -953,8 +1207,7 @@
 
 	* dispnew.c (Fsend_string_to_terminal): Doc fix.
 
-	* data.c (Fterminal_local_value, Fset_terminal_local_value): Doc
-	fixes.
+	* data.c (Fterminal_local_value, Fset_terminal_local_value): Doc fixes.
 
 	* coding.c (Fterminal_coding_system): Doc fix.
 
@@ -964,15 +1217,15 @@
 	(Fx_server_vendor, Fx_server_version, Fx_display_screens)
 	(Fx_display_mm_height, Fx_display_mm_width)
 	(Fx_display_backing_store, Fx_display_visual_class)
-	(Fx_display_save_under, Fx_close_connection, Fx_synchronize): Doc
-	fixes, replacing "terminal id" with "terminal object".
+	(Fx_display_save_under, Fx_close_connection, Fx_synchronize):
+	Doc fixes, replacing "terminal id" with "terminal object".
 	(check_x_display_info): Handle terminal objects instead of
 	terminal ids.
 
 	* term.c (Ftty_display_color_p, Ftty_display_color_cells)
 	(Ftty_type, Fcontrolling_tty_p, Ftty_no_underline, Fsuspend_tty)
-	(Fresume_tty, Vsuspend_tty_functions, Vresume_tty_functions): Doc
-	fixes, replacing "terminal id" with "terminal object".
+	(Fresume_tty, Vsuspend_tty_functions, Vresume_tty_functions):
+	Doc fixes, replacing "terminal id" with "terminal object".
 
 2009-04-21  Kenichi Handa  <handa@m17n.org>
 
@@ -981,9 +1234,8 @@
 
 	* coding.c (decode_coding_utf_16): Reduce charbuf_end for the
 	worst case.
-	(decode_coding_emacs_mule, decode_coding_iso_2022)
-	(decode_coding_sjis, decode_coding_big5, decode_coding_charset):
-	Likewise.
+	(decode_coding_sjis, decode_coding_big5, decode_coding_charset)
+	(decode_coding_emacs_mule, decode_coding_iso_2022): Likewise.
 
 2009-04-19  Jason Rumney  <jasonr@gnu.org>
 
@@ -1003,8 +1255,8 @@
 
 2009-04-19  Jan Djärv  <jan.h.d@swipnet.se>
 
-	* gtkutil.c (xg_tool_bar_menu_proxy, update_frame_tool_bar): Use
-	G_CALLBACK instead of GTK_SIGNAL_FUNC which is deprecated.
+	* gtkutil.c (xg_tool_bar_menu_proxy, update_frame_tool_bar):
+	Use G_CALLBACK instead of GTK_SIGNAL_FUNC which is deprecated.
 	(xg_initialize): Use g_type_class_ref instead of gtk_type_class which
 	is deprecated.
 
@@ -1050,8 +1302,7 @@
 
 2009-04-16  Kenichi Handa  <handa@m17n.org>
 
-	* xfont.c (xfont_has_char): Special handling of `ja' and `ko'
-	adstyle.
+	* xfont.c (xfont_has_char): Special handling of `ja' and `ko' adstyle.
 
 	* xftfont.c (xftfont_has_char): Special handling of `ja' and `ko'
 	adstyle.
@@ -1060,8 +1311,8 @@
 	(enum ftfont_cache_for): New enum.
 	(fc_charset_table): Undo the previous change.
 	(ftfont_get_latin1_charset): Delete it.
-	(ftfont_pattern_entity): Check cache by ftfont_lookup_cache.  Set
-	FONT_SIZE_INDEX of the entity to 0 for a scalable font.  For a
+	(ftfont_pattern_entity): Check cache by ftfont_lookup_cache.
+	Set FONT_SIZE_INDEX of the entity to 0 for a scalable font.  For a
 	non-scarable font, try to get AVERAGE_WIDTH.
 	(ftfont_lookup_cache): Argument FOR-FACE is changed to CACHE_FOR.
 	Change ft_face_cache from a list of a hash-table.  Don't check
@@ -1069,8 +1320,7 @@
 	(ftfont_get_fc_charset): Call ftfont_lookup_cache with
 	FTFONT_CACHE_FOR_CHARET.
 	(ftfont_get_charset): Undo the previous change.
-	(ftfont_open): Call ftfont_lookup_cache with
-	FTFONT_CACHE_FOR_FACE.
+	(ftfont_open): Call ftfont_lookup_cache with FTFONT_CACHE_FOR_FACE.
 	(ftfont_close): Likewise.
 	(ftfont_has_char): Special handling of `ja' and `ko' adstyle.
 
@@ -1129,8 +1379,7 @@
 
 2009-04-13  Kenichi Handa  <handa@m17n.org>
 
-	* font.c (font_delete_unmatched): Preserve the order of list
-	elements.
+	* font.c (font_delete_unmatched): Preserve the order of list elements.
 	(font_select_entity): Suppress the code to optimize for the same
 	kind of fonts.
 	(font_load_for_lface): Get a font that supports at least ASCII
@@ -1146,8 +1395,7 @@
 	Delete iso-8859-1 range from the charset of fonts whose adstyle is
 	`ko' or `ja'.
 	(ftfont_get_fc_charset): Call ftfont_lookup_cache with ENTITY.
-	(ftfont_get_charset): For iso8859-1, call
-	ftfont_get_latin1_charset.
+	(ftfont_get_charset): For iso8859-1, call ftfont_get_latin1_charset.
 	(ftfont_list): Don't refuse a font spec with non-nil `adstyle'
 	property.
 	(ftfont_open): Call ftfont_lookup_cache with ENTITY.
@@ -1167,8 +1415,7 @@
 	* dispnew.c (redraw_overlapping_rows): Fix detection of
 	overlapping for topmost and bottommost rows.
 
-	* ftfont.c (ftfont_text_extents): Fix calculation of
-	metrics->descent.
+	* ftfont.c (ftfont_text_extents): Fix calculation of metrics->descent.
 
 2009-04-06  Jason Rumney  <jasonr@gnu.org>
 
