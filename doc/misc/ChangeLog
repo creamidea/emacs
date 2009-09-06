@@ -1,3 +1,52 @@
+2009-09-02  Carsten Dominik  <carsten.dominik@gmail.com>
+
+	* org.texi (Effort estimates): Document new effort setting commands.
+	(Agenda commands): Document the new keys fro agenda time motion.
+	Document entry text mode.  Improve documentation of the keys to include
+	inactive time stamps into the agenda view.
+	(Feedback): Document the new bug report command.
+	(Structure editing): Added an index entry for the sorting of subtrees.
+
+2009-09-02  Glenn Morris  <rgm@gnu.org>
+
+	* emacs-mime.texi (time-date): Mention float-time.
+
+2009-08-30  Jay Belanger  <jay.p.belanger@gmail.com>
+
+	* calc.texi (Simplifying Formulas): Improve the wording.
+
+2009-08-29  Teodor Zlatanov  <tzz@lifelogs.com>
+
+	* auth.texi: Rewritten for coverage and clarity.
+
+2009-08-29  Katsumi Yamaoka  <yamaoka@jpl.org>
+
+	* gnus.texi (Expiring Mail): Mention
+	gnus-mark-copied-or-moved-articles-as-expirable.
+	(Various Various): Mention gnus-safe-html-newsgroups.
+
+	* gnus-news.texi: Mention
+	gnus-mark-copied-or-moved-articles-as-expirable.
+
+	* emacs-mime.texi (Display Customization): Add xref to
+	gnus-safe-html-newsgroups.
+
+2009-08-28  Michael Albinus  <michael.albinus@gmx.de>
+
+	* tramp.texi (Version Control): Remove.
+	(Obtaining Tramp): Update cvs checkout command. Remove nightly tarballs
+	reference.
+	(External methods): Correct `scpc' concept index entries.  New method
+	`rsyncc'.
+	(External packages): New subsections "Filename completion" and "File
+	attributes cache".
+
+2009-08-27  Jay Belanger  <jay.p.belanger@gmail.com>
+
+	* calc.texi (Rewrite Rules): Improve the example.
+	(Simplifying Formulas): Explain use of the I and H flags for
+	simplification.
+
 2009-08-25  Michael Albinus  <michael.albinus@gmx.de>
 
 	* dbus.texi (Bus names): Add optional parameter TIMEOUT to dbus-ping.

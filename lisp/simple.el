@@ -999,7 +999,7 @@ in *Help* buffer.  See also the command `describe-char'."
 	    encoded encoding-msg display-prop under-display)
 	(if (or (not coding)
 		(eq (coding-system-type coding) t))
-	    (setq coding default-buffer-file-coding-system))
+	    (setq coding (default-value 'buffer-file-coding-system)))
 	(if (eq (char-charset char) 'eight-bit)
 	    (setq encoding-msg
 		  (format "(%d, #o%o, #x%x, raw-byte)" char char char))
@@ -2794,6 +2794,23 @@ ring directly.")
 (defvar kill-ring-yank-pointer nil
   "The tail of the kill ring whose car is the last thing yanked.")
 
+(defcustom save-interprogram-paste-before-kill nil
+  "Save the paste strings into `kill-ring' before replacing it with emacs strings.
+When one selects something in another program to paste it into Emacs,
+but kills something in Emacs before actually pasting it,
+this selection is gone unless this variable is non-nil,
+in which case the other program's selection is saved in the `kill-ring'
+before the Emacs kill and one can still paste it using \\[yank] \\[yank-pop]."
+  :type 'boolean
+  :group 'killing
+  :version "23.2")
+
+(defcustom kill-do-not-save-duplicates nil
+  "Do not add a new string to `kill-ring' when it is the same as the last one."
+  :type 'boolean
+  :group 'killing
+  :version "23.2")
+
 (defun kill-new (string &optional replace yank-handler)
   "Make STRING the latest kill in the kill ring.
 Set `kill-ring-yank-pointer' to point to it.
@@ -2806,6 +2823,10 @@ inserted into a buffer; see `insert-for-yank' for details.
 When a yank handler is specified, STRING must be non-empty (the yank
 handler, if non-nil, is stored as a `yank-handler' text property on STRING).
 
+When `save-interprogram-paste-before-kill' and `interprogram-paste-function'
+are non-nil, saves the interprogram paste string(s) into `kill-ring' before
+STRING.
+
 When the yank handler has a non-nil PARAM element, the original STRING
 argument is not used by `insert-for-yank'.  However, since Lisp code
 may access and use elements from the kill ring directly, the STRING
@@ -2817,8 +2838,19 @@ argument should still be a \"useful\" string for such uses."
     (if yank-handler
 	(signal 'args-out-of-range
 		(list string "yank-handler specified for empty string"))))
+  (when (and kill-do-not-save-duplicates
+             (equal string (car kill-ring)))
+    (setq replace t))
   (if (fboundp 'menu-bar-update-yank-menu)
       (menu-bar-update-yank-menu string (and replace (car kill-ring))))
+  (when save-interprogram-paste-before-kill
+    (let ((interprogram-paste (and interprogram-paste-function
+                                   (funcall interprogram-paste-function))))
+      (when interprogram-paste
+        (if (listp interprogram-paste)
+            (dolist (s (nreverse interprogram-paste))
+              (push s kill-ring))
+            (push interprogram-paste kill-ring)))))
   (if (and replace kill-ring)
       (setcar kill-ring string)
     (push string kill-ring)

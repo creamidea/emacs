@@ -1515,6 +1515,20 @@ returns t if the buffer had changes, nil otherwise."
       ;; because we don't know that yet.
       t)))
 
+(defun vc-read-revision (prompt &optional files backend default initial-input)
+  (cond
+   ((null files)
+    (let ((vc-fileset (vc-deduce-fileset t))) ;FIXME: why t?  --Stef
+      (setq files (cadr vc-fileset))
+      (setq backend (car vc-fileset))))
+   ((null backend) (setq backend (vc-backend (car files)))))
+  (let ((completion-table
+         (vc-call-backend backend 'revision-completion-table files)))
+    (if completion-table
+        (completing-read prompt completion-table
+                         nil nil initial-input nil default)
+      (read-string prompt initial-input nil default))))
+
 ;;;###autoload
 (defun vc-version-diff (files rev1 rev2)
   "Report diffs between revisions of the fileset in the repository history."
@@ -1523,8 +1537,6 @@ returns t if the buffer had changes, nil otherwise."
 	  (files (cadr vc-fileset))
           (backend (car vc-fileset))
 	  (first (car files))
-	  (completion-table
-	   (vc-call-backend backend 'revision-completion-table files))
 	  (rev1-default nil)
 	  (rev2-default nil))
      (cond
@@ -1551,14 +1563,8 @@ returns t if the buffer had changes, nil otherwise."
 			   "Older revision: "))
 	    (rev2-prompt (concat "Newer revision (default "
 				 (or rev2-default "current source") "): "))
-	    (rev1 (if completion-table
-		      (completing-read rev1-prompt completion-table
-				       nil nil nil nil rev1-default)
-		    (read-string rev1-prompt nil nil rev1-default)))
-	    (rev2 (if completion-table
-		      (completing-read rev2-prompt completion-table
-				       nil nil nil nil rev2-default)
-		    (read-string rev2-prompt nil nil rev2-default))))
+	    (rev1 (vc-read-revision rev1-prompt files backend rev1-default))
+	    (rev2 (vc-read-revision rev2-prompt files backend rev2-default)))
        (when (string= rev1 "") (setq rev1 nil))
        (when (string= rev2 "") (setq rev2 nil))
        (list files rev1 rev2))))
@@ -1598,13 +1604,9 @@ If `F.~REV~' already exists, use it instead of checking it out again."
   (interactive
    (save-current-buffer
      (vc-ensure-vc-buffer)
-     (let ((completion-table
-            (vc-call revision-completion-table (list buffer-file-name)))
-           (prompt "Revision to visit (default is working revision): "))
-       (list
-        (if completion-table
-            (completing-read prompt completion-table)
-          (read-string prompt))))))
+     (list
+      (vc-read-revision "Revision to visit (default is working revision): "
+                        (list buffer-file-name)))))
   (vc-ensure-vc-buffer)
   (let* ((file buffer-file-name)
 	 (revision (if (string-equal rev "")
@@ -1730,16 +1732,22 @@ See Info node `Merging'."
 	  (vc-checkout file t)
 	(error "Merge aborted"))))
     (setq first-revision
-	  (read-string (concat "Branch or revision to merge from "
-			       "(default news on current branch): ")))
+	  (vc-read-revision
+           (concat "Branch or revision to merge from "
+                   "(default news on current branch): ")
+           (list file)
+           backend))
     (if (string= first-revision "")
         (setq status (vc-call-backend backend 'merge-news file))
       (if (not (vc-find-backend-function backend 'merge))
 	  (error "Sorry, merging is not implemented for %s" backend)
 	(if (not (vc-branch-p first-revision))
 	    (setq second-revision
-		  (read-string "Second revision: "
-			       (concat (vc-branch-part first-revision) ".")))
+		  (vc-read-revision
+                   "Second revision: "
+                   (list file) backend nil
+                   ;; FIXME: This is CVS/RCS/SCCS specific.
+                   (concat (vc-branch-part first-revision) ".")))
 	  ;; We want to merge an entire branch.  Set revisions
 	  ;; accordingly, so that vc-BACKEND-merge understands us.
 	  (setq second-revision first-revision)
@@ -1825,17 +1833,6 @@ allowed and simply skipped)."
       (vc-call-backend ',backend 'log-view-mode)
       (set (make-local-variable 'log-view-vc-backend) ',backend)
       (set (make-local-variable 'log-view-vc-fileset) ',files)
-
-      ;; FIXME: this seems to apply only to RCS/CVS, it doesn't quite
-      ;; belong here in the generic code.
-      (goto-char (point-max))
-      (forward-line -1)
-      (while (looking-at "=*\n")
-      	(delete-char (- (match-end 0) (match-beginning 0)))
-      	(forward-line -1))
-      (goto-char (point-min))
-      (when (looking-at "[\b\t\n\v\f\r ]+")
-      	(delete-char (- (match-end 0) (match-beginning 0))))
 
       (shrink-window-if-larger-than-buffer)
       ;; move point to the log entry for the working revision
@@ -2243,11 +2240,6 @@ log entries should be gathered."
 ;; functions that operate on RCS revision numbers.  This code should
 ;; also be moved into the backends.  It stays for now, however, since
 ;; it is used in code below.
-;;;###autoload
-(defun vc-trunk-p (rev)
-  "Return t if REV is a revision on the trunk."
-  (not (eq nil (string-match "\\`[0-9]+\\.[0-9]+\\'" rev))))
-
 (defun vc-branch-p (rev)
   "Return t if REV is a branch revision."
   (not (eq nil (string-match "\\`[0-9]+\\(\\.[0-9]+\\.[0-9]+\\)*\\'" rev))))
@@ -2259,42 +2251,8 @@ log entries should be gathered."
     (when index
       (substring rev 0 index))))
 
-(defun vc-minor-part (rev)
-  "Return the minor revision number of a revision number REV."
-  (string-match "[0-9]+\\'" rev)
-  (substring rev (match-beginning 0) (match-end 0)))
-
 (define-obsolete-function-alias
   'vc-default-previous-version 'vc-default-previous-revision "23.1")
-
-(defun vc-default-previous-revision (backend file rev)
-  "Return the revision number immediately preceding REV for FILE,
-or nil if there is no previous revision.  This default
-implementation works for MAJOR.MINOR-style revision numbers as
-used by RCS and CVS."
-  (let ((branch (vc-branch-part rev))
-        (minor-num (string-to-number (vc-minor-part rev))))
-    (when branch
-      (if (> minor-num 1)
-          ;; revision does probably not start a branch or release
-          (concat branch "." (number-to-string (1- minor-num)))
-        (if (vc-trunk-p rev)
-            ;; we are at the beginning of the trunk --
-            ;; don't know anything to return here
-            nil
-          ;; we are at the beginning of a branch --
-          ;; return revision of starting point
-          (vc-branch-part branch))))))
-
-(defun vc-default-next-revision (backend file rev)
-  "Return the revision number immediately following REV for FILE,
-or nil if there is no next revision.  This default implementation
-works for MAJOR.MINOR-style revision numbers as used by RCS
-and CVS."
-  (when (not (string= rev (vc-working-revision file)))
-    (let ((branch (vc-branch-part rev))
-	  (minor-num (string-to-number (vc-minor-part rev))))
-      (concat branch "." (number-to-string (1+ minor-num))))))
 
 (defun vc-default-responsible-p (backend file)
   "Indicate whether BACKEND is reponsible for FILE.
@@ -2313,63 +2271,6 @@ editing non-current revisions is not supported by default."
   t)
 
 (defun vc-default-init-revision (backend) vc-default-init-revision)
-
-(defalias 'vc-cvs-update-changelog 'vc-update-changelog-rcs2log)
-
-(defalias 'vc-rcs-update-changelog 'vc-update-changelog-rcs2log)
-
-;; FIXME: This should probably be moved to vc-rcs.el and replaced in
-;; vc-cvs.el by code using cvs2cl.
-(defun vc-update-changelog-rcs2log (files)
-  "Default implementation of update-changelog.
-Uses `rcs2log' which only works for RCS and CVS."
-  ;; FIXME: We (c|sh)ould add support for cvs2cl
-  (let ((odefault default-directory)
-	(changelog (find-change-log))
-	;; Presumably not portable to non-Unixy systems, along with rcs2log:
-	(tempfile (make-temp-file
-		   (expand-file-name "vc"
-				     (or small-temporary-file-directory
-					 temporary-file-directory))))
-        (login-name (or user-login-name
-                        (format "uid%d" (number-to-string (user-uid)))))
-	(full-name (or add-log-full-name
-		       (user-full-name)
-		       (user-login-name)
-		       (format "uid%d" (number-to-string (user-uid)))))
-	(mailing-address (or add-log-mailing-address
-			     user-mail-address)))
-    (find-file-other-window changelog)
-    (barf-if-buffer-read-only)
-    (vc-buffer-sync)
-    (undo-boundary)
-    (goto-char (point-min))
-    (push-mark)
-    (message "Computing change log entries...")
-    (message "Computing change log entries... %s"
-	     (unwind-protect
-		 (progn
-		   (setq default-directory odefault)
-		   (if (eq 0 (apply 'call-process
-                                    (expand-file-name "rcs2log"
-                                                      exec-directory)
-                                    nil (list t tempfile) nil
-                                    "-c" changelog
-                                    "-u" (concat login-name
-                                                 "\t" full-name
-                                                 "\t" mailing-address)
-                                    (mapcar
-                                     (lambda (f)
-                                       (file-relative-name
-					(expand-file-name f odefault)))
-                                     files)))
-                       "done"
-		     (pop-to-buffer (get-buffer-create "*vc*"))
-		     (erase-buffer)
-		     (insert-file-contents tempfile)
-		     "failed"))
-	       (setq default-directory (file-name-directory changelog))
-	       (delete-file tempfile)))))
 
 (defun vc-default-find-revision (backend file rev buffer)
   "Provide the new `find-revision' op based on the old `checkout' op.

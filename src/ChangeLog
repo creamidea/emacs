@@ -1,3 +1,107 @@
+2009-09-03  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* dispnew.c (Fsend_string_to_terminal): Make it work again on the
+	initial terminal as well.
+
+2009-09-02  Jan Djärv  <jan.h.d@swipnet.se>
+
+	* xterm.h: Rename x_non_menubar_window_to_frame to
+	x_menubar_window_to_frame.
+
+	* xterm.c: Remove declarations also in xterm.h
+	(XTmouse_position): Do not return valid positions
+	for clicks in the menubar and the toolbar for Gtk+.
+
+	* xfns.c (x_any_window_to_frame): Assume less about Gtk+ internals,
+	if the widget for the event has the same top level as a frame,
+	return the frame.
+	(x_menubar_window_to_frame): Detect menu bar even with Gtk+
+	internal windows, bug #4122.
+	(x_non_menubar_window_to_frame): Remove.
+
+2009-09-02  Glenn Morris  <rgm@gnu.org>
+
+	* buffer.c (default-major-mode): Move most of the doc from here...
+	(major-mode): ... to here.
+
+2009-08-30  Nick Roberts  <nickrob@snap.net.nz>
+
+	* process.c (wait_reading_process_output): Keep the descriptor
+	when pty is used by a non-child process, e.g., in I/O buffer of
+	GDB this allows inferior to be restarted.
+
+2009-08-29  Eli Zaretskii  <eliz@gnu.org>
+
+	* xdisp.c (redisplay_internal): Remove redundant test and collapse
+	both branches into one.
+
+2009-08-29  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* emacs.c (USAGE1): Remove --(no-)multibyte, --(no-)unibyte.
+	(main): Use enable-multibyte-characters rather than
+	default-enable-multibyte-characters.  Output a warning message when
+	running a unibyte session.
+
+2009-08-28  YAMAMOTO Mitsuharu  <mituharu@math.s.chiba-u.ac.jp>
+
+	* unexmacosx.c (print_load_command_name) [LC_DYLD_INFO]: Add cases
+	LC_DYLD_INFO and LC_DYLD_INFO_ONLY.
+	(copy_data_segment): Also copy __program_vars section.
+	(copy_dyld_info) [LC_DYLD_INFO]: New function.
+	(dump_it) [LC_DYLD_INFO]: Use it.
+
+	* s/darwin.h [temacs]: Undef HAVE_POSIX_MEMALIGN.
+
+2009-08-28  Eli Zaretskii  <eliz@gnu.org>
+
+	* makefile.w32-in ($(BLD)/doc.$(O)): Depend on buildobj.h, not on
+	$(SRC)/buildobj.h.
+	(buildobj.h): Renamed from $(SRC)/buildobj.h.
+	(make-buildobj-CMD, make-buildobj-SH): Create buildobj.h, not
+	$(SRC)/buildobj.h.
+	(clean): Add buildobj.h.
+
+2009-08-28  Teodor Zlatanov  <tzz@lifelogs.com>
+
+	* print.c (print_object): Set escapeflag to 1 when printing
+	hashtable keys and values.
+
+2009-08-27  Stefan Monnier  <monnier@iro.umontreal.ca>
+
+	* lread.c (read_integer): Use doubles (and potentially return a float
+	number) as we do in string-to-number.
+	(read1): Use strtol to read integers, signal errors on strtol's
+	overflow and use floats if strtol's output is too large for
+	Elisp integers.
+
+2009-08-27  Eli Zaretskii  <eliz@gnu.org>
+
+	* makefile.w32-in ($(SRC)/buildobj.h, make-buildobj-CMD)
+	(make-buildobj-SH): Fix last change.
+	(SRC): Move to before where it's first used.
+
+2009-08-27  Kenichi Handa  <handa@m17n.org>
+
+	* process.c (send_process): Use encode_coding_object instead of
+	encode_coding_string to perform eol-conversion even if the string
+	is unibyte.
+
+	* coding.c (encode_coding_utf_16): Fix checking of a Unicode
+	character.
+
+	* cmds.c (Fself_insert_command): Avoid unnecessay
+	unibyte->multibyte conversion.  (Bug#4240)  (Bug#4037)
+
+2009-08-26  Dan Nicolaescu  <dann@ics.uci.edu>
+
+	* callproc.c (Fcall_process): Remove always true #if.
+
+	* lisp.h: Replace #if 0 code for checking with text pointing to
+	the --enable-checking configure flag.
+
+	* emacs.c (main): Mention the --enable-profiling configure flag
+	instead of using CFLAGS.
+
 2009-08-26  Ken Raeburn  <raeburn@raeburn.org>
 
 	* Makefile.in (buildobj.h): New target.
@@ -21,6 +125,9 @@
 	timeout values in doc string.
 
 2009-08-25  Kenichi Handa  <handa@m17n.org>
+
+	* alloc.c (mark_char_table): New function.
+	(mark_object): Use mark_char_table for a char-table.
 
 	* lisp.h (CHAR_TABLE_REF_ASCII): New macro.
 	(CHAR_TABLE_REF): Use it.
@@ -220,7 +327,8 @@
 
 2009-07-27  Dan Nicolaescu  <dann@ics.uci.edu>
 
-	* s/netbsd.h (SIGNALS_VIA_CHARACTERS): Remove, already defined in bsd-common.h
+	* s/netbsd.h (SIGNALS_VIA_CHARACTERS): Remove, already defined in
+	bsd-common.h.
 
 2009-07-27  Kenichi Handa  <handa@m17n.org>
 
@@ -392,7 +500,7 @@
 2009-07-10  Jan Djärv  <jan.h.d@swipnet.se>
 
 	* xfns.c (Fx_select_font): Remember last font selected in
-	x_last_font_name and use that the next time. Also try the frame
+	x_last_font_name and use that the next time.  Also try the frame
 	parameter font-parameter as default to the font dialog.
 
 2009-07-10  Kenichi Handa  <handa@m17n.org>
@@ -531,12 +639,12 @@
 	for MapNotify.
 
 	* gtkutil.c (xg_frame_set_char_size): Do not set pixel width/height
-	here or	call change_frame_size. Just call flush_and_sync.
+	here or call change_frame_size.  Just call flush_and_sync.
 	(flush_and_sync): Reintroduce.
 
 2009-07-01  Jan Djärv  <jan.h.d@swipnet.se>
 
-	* xterm.h (struct x_display_info): Add Xatom_net_wm_state_sticky
+	* xterm.h (struct x_display_info): Add Xatom_net_wm_state_sticky.
 
 	* xterm.c (x_handle_net_wm_state): Also look for sticky.
 	(x_term_init): Initialize Xatom_net_wm_state_sticky.
@@ -573,14 +681,14 @@
 	Declare Qfullwidth, Qfullheight, Qfullboth, Qmaximized.
 
 	* xterm.c (handle_one_xevent): Remove call to x_check_fullscreen
-	for Expose event. Add call to x_check_fullscreen for MapNotify event.
-	Remove all code w.r.t. fullscreen from ConfigureNotify event. Do not
+	for Expose event.  Add call to x_check_fullscreen for MapNotify event.
+	Remove all code w.r.t. fullscreen from ConfigureNotify event.  Do not
 	set gravity to NorthWestGravity when USE_GTK.
 	(set_wm_state): New function.
-	(do_ewmh_fullscreen): Use set_wm_state. Also handle FULLSCREEN_MAXIMIZED.
+	(do_ewmh_fullscreen): Use set_wm_state.  Also handle FULLSCREEN_MAXIMIZED.
 	(x_handle_net_wm_state): Handle FULLSCREEN_MAXIMIZED.
 	(x_check_fullscreen): Simplify so we only handle EMWH type of fullscreen
-	or the case when no window manager is running. That means remove calls
+	or the case when no window manager is running.  That means remove calls
 	to x_real_positions and x_fullscreen_adjust.
 
 	* gtkutil.c (flush_and_sync, x_wm_size_hint_off): Remove.
@@ -677,7 +785,7 @@
 
 	* m/pmax.h: Restore file, with only netbsd portions.
 
-2009-06-26  David Reitter <david.reitter@gmail.com>
+2009-06-26  David Reitter  <david.reitter@gmail.com>
 
 	* nsterm.m (keydown): Avoid infinite loop.
 
@@ -922,7 +1030,7 @@
 	* nsterm.m (ns_draw_window_cursor): Respect cursor_type for
 	nonactive windows.
 
-2009-06-08 Felix Mueller  <felix@enqueue.eu>  (tiny change)
+2009-06-08  Felix Mueller  <felix@enqueue.eu>  (tiny change)
 
 	* nsterm.m (ns_init_paths): Append path separator to INFOPATH variable.
 
@@ -2154,7 +2262,7 @@
 	handling_signal is set.
 	(EmacsMenu-fillWithWidgetValue:): Set submenu title.
 
-	* config.in: Get rid of COCOA_EXPERIMENTAL_CTRL_G
+	* config.in: Get rid of COCOA_EXPERIMENTAL_CTRL_G.
 
 	* s/darwin.h: Same and NO_SOCK_SIGIO as well.
 

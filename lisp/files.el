@@ -2100,7 +2100,7 @@ not set local variables (though we do notice a mode specified with -*-.)
 or from Lisp without specifying the optional argument FIND-FILE;
 in that case, this function acts as if `enable-local-variables' were t."
   (interactive)
-  (funcall (or default-major-mode 'fundamental-mode))
+  (funcall (or (default-value 'major-mode) 'fundamental-mode))
   (let ((enable-local-variables (or (not find-file) enable-local-variables)))
     (report-errors "File mode specification error: %s"
       (set-auto-mode))
@@ -2402,6 +2402,7 @@ If FUNCTION is nil, then it is not called.  (That is a way of saying
 
 (defvar magic-fallback-mode-alist
   `((image-type-auto-detected-p . image-mode)
+    ("\\(PK00\\)?[P]K\003\004" . archive-mode) ; zip
     ;; The < comes before the groups (but the first) to reduce backtracking.
     ;; TODO: UTF-16 <?xml may be preceded by a BOM 0xff 0xfe or 0xfe 0xff.
     ;; We use [ \t\r\n] instead of `\\s ' to make regex overflow less likely.
@@ -5376,17 +5377,13 @@ program specified by `directory-free-space-program' if that is non-nil."
 	(let ((fsinfo (file-system-info dir)))
 	  (if fsinfo
 	      (format "%.0f" (/ (nth 2 fsinfo) 1024))))
+      (setq dir (expand-file-name dir))
       (save-match-data
 	(with-temp-buffer
 	  (when (and directory-free-space-program
 		     ;; Avoid failure if the default directory does
 		     ;; not exist (Bug#2631, Bug#3911).
-		     (let ((default-directory default-directory))
-		       (setq dir (expand-file-name dir))
-		       (unless (and (not (file-remote-p default-directory))
-				    (file-directory-p default-directory)
-				    (file-readable-p default-directory))
-			 (setq default-directory "/"))
+		     (let ((default-directory "/"))
 		       (eq (call-process directory-free-space-program
 					 nil t nil
 					 directory-free-space-args

@@ -156,6 +156,7 @@
 ;;     Some versions of `file' can be customized to recognize that.
 
 (require 'backquote)
+(eval-when-compile (require 'cl))
 
 (or (fboundp 'defsubst)
     ;; This really ought to be loaded already!
@@ -426,7 +427,7 @@ else the global value will be modified."
 (defvar byte-compile-interactive-only-functions
   '(beginning-of-buffer end-of-buffer replace-string replace-regexp
     insert-file insert-buffer insert-file-literally previous-line next-line
-    goto-line)
+    goto-line comint-run)
   "List of commands that are not meant to be called from Lisp.")
 
 (defvar byte-compile-not-obsolete-var nil
@@ -1505,7 +1506,14 @@ If ANY-VALUE is nil, only return non-nil if the value of the symbol is the
 symbol itself."
   (or (memq symbol '(nil t))
       (keywordp symbol)
-      (if any-value (memq symbol byte-compile-const-variables))))
+      (if any-value
+	  (or (memq symbol byte-compile-const-variables)
+	      ;; FIXME: We should provide a less intrusive way to find out
+	      ;; is a variable is "constant".
+	      (and (boundp symbol)
+		   (condition-case nil
+		       (progn (set symbol (symbol-value symbol)) nil)
+		     (setting-constant t)))))))
 
 (defmacro byte-compile-constp (form)
   "Return non-nil if FORM is a constant."
@@ -1747,12 +1755,12 @@ The value is non-nil if there were no errors, nil if errors."
 	(set-buffer-multibyte nil))
       ;; Run hooks including the uncompression hook.
       ;; If they change the file name, then change it for the output also.
-      (let ((buffer-file-name bytecomp-filename)
-	    (default-major-mode 'emacs-lisp-mode)
-	    ;; Ignore unsafe local variables.
-	    ;; We only care about a few of them for our purposes.
-	    (enable-local-variables :safe)
-	    (enable-local-eval nil))
+      (letf ((buffer-file-name bytecomp-filename)
+             ((default-value 'major-mode) 'emacs-lisp-mode)
+             ;; Ignore unsafe local variables.
+             ;; We only care about a few of them for our purposes.
+             (enable-local-variables :safe)
+             (enable-local-eval nil))
 	;; Arg of t means don't alter enable-local-variables.
         (normal-mode t)
         (setq bytecomp-filename buffer-file-name))
@@ -3482,9 +3490,15 @@ That command is designed for interactive use only" fn))
   (let ((args (cdr form))
 	setters)
     (while args
-      (setq setters
-	    (cons (list 'set-default (list 'quote (car args)) (car (cdr args)))
-		  setters))
+      (let ((var (car args)))
+	(if (or (not (symbolp var))
+		(byte-compile-const-symbol-p var t))
+	    (byte-compile-warn
+	     "variable assignment to %s `%s'"
+	     (if (symbolp var) "constant" "nonvariable")
+	     (prin1-to-string var)))
+	(push (list 'set-default (list 'quote var) (car (cdr args)))
+	      setters))
       (setq args (cdr (cdr args))))
     (byte-compile-form (cons 'progn (nreverse setters)))))
 

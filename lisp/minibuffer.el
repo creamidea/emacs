@@ -30,7 +30,6 @@
 ;;   (boundaries START . END).  See `completion-boundaries'.
 ;;   Any other return value should be ignored (so we ignore values returned
 ;;   from completion tables that don't know about this new `action' form).
-;;   See `completion-boundaries'.
 
 ;;; Bugs:
 
@@ -40,9 +39,20 @@
 ;; - choose-completion can't automatically figure out the boundaries
 ;;   corresponding to the displayed completions.  `base-size' gives the left
 ;;   boundary, but not the righthand one.  So we need to add
-;;   completion-extra-size (and also completion-no-auto-exit).
+;;   completion-extra-size.
 
 ;;; Todo:
+
+;; - make partial-complete-mode obsolete:
+;;   - (?) <foo.h> style completion for file names.
+
+;; - case-sensitivity is currently confuses two issues:
+;;   - whether or not a particular completion table should be case-sensitive
+;;     (i.e. whether strings that different only by case are semantically
+;;     equivalent)
+;;   - whether the user wants completion to pay attention to case.
+;;   e.g. we may want to make it possible for the user to say "first try
+;;   completion case-sensitively, and if that fails, try to ignore case".
 
 ;; - make lisp-complete-symbol and sym-comp use it.
 ;; - add support for ** to pcm.
@@ -248,31 +258,38 @@ The text is displayed for `minibuffer-message-timeout' seconds,
 or until the next input event arrives, whichever comes first.
 Enclose MESSAGE in [...] if this is not yet the case.
 If ARGS are provided, then pass MESSAGE through `format'."
-  ;; Clear out any old echo-area message to make way for our new thing.
-  (message nil)
-  (setq message (if (and (null args) (string-match-p "\\` *\\[.+\\]\\'" message))
-                    ;; Make sure we can put-text-property.
-                    (copy-sequence message)
-                  (concat " [" message "]")))
-  (when args (setq message (apply 'format message args)))
-  (let ((ol (make-overlay (point-max) (point-max) nil t t))
-	;; A quit during sit-for normally only interrupts the sit-for,
-        ;; but since minibuffer-message is used at the end of a command,
-        ;; at a time when the command has virtually finished already, a C-g
-        ;; should really cause an abort-recursive-edit instead (i.e. as if
-        ;; the C-g had been typed at top-level).  Binding inhibit-quit here
-        ;; is an attempt to get that behavior.
-	(inhibit-quit t))
-    (unwind-protect
-        (progn
-          (unless (zerop (length message))
-            ;; The current C cursor code doesn't know to use the overlay's
-            ;; marker's stickiness to figure out whether to place the cursor
-            ;; before or after the string, so let's spoon-feed it the pos.
-            (put-text-property 0 1 'cursor t message))
-          (overlay-put ol 'after-string message)
-          (sit-for (or minibuffer-message-timeout 1000000)))
-      (delete-overlay ol))))
+  (if (not (minibufferp (current-buffer)))
+      (progn
+        (if args
+            (apply 'message message args)
+          (message "%s" message))
+        (prog1 (sit-for (or minibuffer-message-timeout 1000000))
+          (message nil)))
+    ;; Clear out any old echo-area message to make way for our new thing.
+    (message nil)
+    (setq message (if (and (null args) (string-match-p "\\` *\\[.+\\]\\'" message))
+                      ;; Make sure we can put-text-property.
+                      (copy-sequence message)
+                    (concat " [" message "]")))
+    (when args (setq message (apply 'format message args)))
+    (let ((ol (make-overlay (point-max) (point-max) nil t t))
+          ;; A quit during sit-for normally only interrupts the sit-for,
+          ;; but since minibuffer-message is used at the end of a command,
+          ;; at a time when the command has virtually finished already, a C-g
+          ;; should really cause an abort-recursive-edit instead (i.e. as if
+          ;; the C-g had been typed at top-level).  Binding inhibit-quit here
+          ;; is an attempt to get that behavior.
+          (inhibit-quit t))
+      (unwind-protect
+          (progn
+            (unless (zerop (length message))
+              ;; The current C cursor code doesn't know to use the overlay's
+              ;; marker's stickiness to figure out whether to place the cursor
+              ;; before or after the string, so let's spoon-feed it the pos.
+              (put-text-property 0 1 'cursor t message))
+            (overlay-put ol 'after-string message)
+            (sit-for (or minibuffer-message-timeout 1000000)))
+        (delete-overlay ol)))))
 
 (defun minibuffer-completion-contents ()
   "Return the user input in a minibuffer before point as a string.
@@ -296,16 +313,33 @@ the second failed attempt to complete."
   :group 'minibuffer)
 
 (defvar completion-styles-alist
-  '((basic completion-basic-try-completion completion-basic-all-completions)
-    (emacs22 completion-emacs22-try-completion completion-emacs22-all-completions)
-    (emacs21 completion-emacs21-try-completion completion-emacs21-all-completions)
+  '((emacs21
+     completion-emacs21-try-completion completion-emacs21-all-completions
+     "Simple prefix-based completion.")
+    (emacs22
+     completion-emacs22-try-completion completion-emacs22-all-completions
+     "Prefix completion that only operates on the text before point.")
+    (basic
+     completion-basic-try-completion completion-basic-all-completions
+     "Completion of the prefix before point and the suffix after point.")
     (partial-completion
-     completion-pcm-try-completion completion-pcm-all-completions))
+     completion-pcm-try-completion completion-pcm-all-completions
+     "Completion of multiple words, each one taken as a prefix.
+E.g. M-x l-c-h can complete to list-command-history
+and C-x C-f /u/m/s to /usr/monnier/src.")
+    (initials
+     completion-initials-try-completion completion-initials-all-completions
+     "Completion of acronyms and initialisms.
+E.g. can complete M-x lch to list-command-history
+and C-x C-f ~/sew to ~/src/emacs/work."))
   "List of available completion styles.
-Each element has the form (NAME TRY-COMPLETION ALL-COMPLETIONS)
+Each element has the form (NAME TRY-COMPLETION ALL-COMPLETIONS DOC):
 where NAME is the name that should be used in `completion-styles',
-TRY-COMPLETION is the function that does the completion, and
-ALL-COMPLETIONS is the function that lists the completions.")
+TRY-COMPLETION is the function that does the completion (it should
+follow the same calling convention as `completion-try-completion'),
+ALL-COMPLETIONS is the function that lists the completions (it should
+follow the calling convention of `completion-all-completions'),
+and DOC describes the way this style of completion works.")
 
 (defcustom completion-styles '(basic partial-completion emacs22)
   "List of completion styles to use.
@@ -323,19 +357,10 @@ The return value can be either nil to indicate that there is no completion,
 t to indicate that STRING is the only possible completion,
 or a pair (STRING . NEWPOINT) of the completed result string together with
 a new position for point."
-  ;; The property `completion-styles' indicates that this functional
-  ;; completion-table claims to take care of completion styles itself.
-  ;; [I.e. It will most likely call us back at some point. ]
-  (if (and (symbolp table) (get table 'completion-styles))
-      ;; Extended semantics for functional completion-tables:
-      ;; They accept a 4th argument `point' and when called with action=nil
-      ;; and this 4th argument (a position inside `string'), they should
-      ;; return instead of a string a pair (STRING . NEWPOINT).
-      (funcall table string pred nil point)
-    (completion--some (lambda (style)
-                        (funcall (nth 1 (assq style completion-styles-alist))
-                                 string table pred point))
-                      completion-styles)))
+  (completion--some (lambda (style)
+                      (funcall (nth 1 (assq style completion-styles-alist))
+                               string table pred point))
+                    completion-styles))
 
 (defun completion-all-completions (string table pred point)
   "List the possible completions of STRING in completion table TABLE.
@@ -343,19 +368,12 @@ Only the elements of table that satisfy predicate PRED are considered.
 POINT is the position of point within STRING.
 The return value is a list of completions and may contain the base-size
 in the last `cdr'."
-  ;; The property `completion-styles' indicates that this functional
-  ;; completion-table claims to take care of completion styles itself.
-  ;; [I.e. It will most likely call us back at some point. ]
-  (if (and (symbolp table) (get table 'completion-styles))
-      ;; Extended semantics for functional completion-tables:
-      ;; They accept a 4th argument `point' and when called with action=t
-      ;; and this 4th argument (a position inside `string'), they may
-      ;; return BASE-SIZE in the last `cdr'.
-      (funcall table string pred t point)
-    (completion--some (lambda (style)
-                        (funcall (nth 2 (assq style completion-styles-alist))
-                                 string table pred point))
-                      completion-styles)))
+  ;; FIXME: We need to additionally return completion-extra-size (similar
+  ;; to completion-base-size but for the text after point).
+  (completion--some (lambda (style)
+                      (funcall (nth 2 (assq style completion-styles-alist))
+                               string table pred point))
+                    completion-styles))
 
 (defun minibuffer--bitset (modified completions exact)
   (logior (if modified    4 0)
@@ -872,6 +890,23 @@ the completions buffer."
       (run-hooks 'completion-setup-hook)))
   nil)
 
+(defvar completion-annotate-function
+  nil
+  ;; Note: there's a lot of scope as for when to add annotations and
+  ;; what annotations to add.  E.g. completing-help.el allowed adding
+  ;; the first line of docstrings to M-x completion.  But there's
+  ;; a tension, since such annotations, while useful at times, can
+  ;; actually drown the useful information.
+  ;; So completion-annotate-function should be used parsimoniously, or
+  ;; else only used upon a user's request (e.g. we could add a command
+  ;; to completion-list-mode to add annotations to the current
+  ;; completions).
+  "Function to add annotations in the *Completions* buffer.
+The function takes a completion and should either return nil, or a string that
+will be displayed next to the completion.  The function can access the
+completion table and predicates via `minibuffer-completion-table' and related
+variables.")
+
 (defun minibuffer-completion-help ()
   "Display a list of possible completions of the current minibuffer contents."
   (interactive)
@@ -892,8 +927,15 @@ the completions buffer."
             ;; Remove the base-size tail because `sort' requires a properly
             ;; nil-terminated list.
             (when last (setcdr last nil))
-            (display-completion-list (nconc (sort completions 'string-lessp)
-                                            base-size))))
+            (setq completions (sort completions 'string-lessp))
+            (when completion-annotate-function
+              (setq completions
+                    (mapcar (lambda (s)
+                              (let ((ann
+                                     (funcall completion-annotate-function s)))
+                                (if ann (list s ann) s)))
+                            completions)))
+            (display-completion-list (nconc completions base-size))))
 
       ;; If there are no completions, or if the current input is already the
       ;; only possible completion, then hide (previous&stale) completions.
@@ -998,8 +1040,11 @@ the completions buffer."
         (if (eq (aref string (1- beg)) ?{)
             (setq table (apply-partially 'completion-table-with-terminator
                                          "}" table)))
-        (completion-table-with-context
-         prefix table (substring string beg) pred action)))))
+        ;; Even if file-name completion is case-insensitive, we want
+        ;; envvar completion to be case-sensitive.
+        (let ((completion-ignore-case nil))
+          (completion-table-with-context
+           prefix table (substring string beg) pred action))))))
 
 (defun completion--file-name-table (string pred action)
   "Internal subroutine for `read-file-name'.  Do not call this."
@@ -1447,15 +1492,15 @@ or a symbol chosen among `any', `star', `point'."
 
 (defun completion-pcm--pattern->regex (pattern &optional group)
   (let ((re
-  (concat "\\`"
-          (mapconcat
-           (lambda (x)
-             (case x
+         (concat "\\`"
+                 (mapconcat
+                  (lambda (x)
+                    (case x
                       ((star any point)
                        (if (if (consp group) (memq x group) group)
-                                     "\\(.*?\\)" ".*?"))
-               (t (regexp-quote x))))
-           pattern
+                           "\\(.*?\\)" ".*?"))
+                      (t (regexp-quote x))))
+                  pattern
                   ""))))
     ;; Avoid pathological backtracking.
     (while (string-match "\\.\\*\\?\\(?:\\\\[()]\\)*\\(\\.\\*\\?\\)" re)
@@ -1720,6 +1765,44 @@ filter out additional entries (because TABLE migth not obey PRED)."
        (if minibuffer-completing-file-name
            'completion-pcm--filename-try-filter))
     (completion-pcm--merge-try pattern all prefix suffix)))
+
+;;; Initials completion
+;; Complete /ums to /usr/monnier/src or lch to list-command-history.
+
+(defun completion-initials-expand (str table pred)
+  (unless (or (zerop (length str))
+              (string-match completion-pcm--delim-wild-regex str))
+    (let ((bounds (completion-boundaries str table pred "")))
+      (if (zerop (car bounds))
+          (mapconcat 'string str "-")
+        ;; If there's a boundary, it's trickier.  The main use-case
+        ;; we consider here is file-name completion.  We'd like
+        ;; to expand ~/eee to ~/e/e/e and /eee to /e/e/e.
+        ;; But at the same time, we don't want /usr/share/ae to expand
+        ;; to /usr/share/a/e just because we mistyped "ae" for "ar",
+        ;; so we probably don't want initials to touch anything that
+        ;; looks like /usr/share/foo.  As a heuristic, we just check that
+        ;; the text before the boundary char is at most 1 char.
+        ;; This allows both ~/eee and /eee and not much more.
+        ;; FIXME: It sadly also disallows the use of ~/eee when that's
+        ;; embedded within something else (e.g. "(~/eee" in Info node
+        ;; completion or "ancestor:/eee" in bzr-revision completion).
+        (when (< (car bounds) 3)
+          (let ((sep (substring str (1- (car bounds)) (car bounds))))
+            ;; FIXME: the above string-match checks the whole string, whereas
+            ;; we end up only caring about the after-boundary part.
+            (concat (substring str 0 (car bounds))
+                    (mapconcat 'string (substring str (car bounds)) sep))))))))
+
+(defun completion-initials-all-completions (string table pred point)
+  (let ((newstr (completion-initials-expand string table pred)))
+    (when newstr
+      (completion-pcm-all-completions newstr table pred (length newstr)))))
+
+(defun completion-initials-try-completion (string table pred point)
+  (let ((newstr (completion-initials-expand string table pred)))
+    (when newstr
+      (completion-pcm-try-completion newstr table pred (length newstr)))))
 
 
 (provide 'minibuffer)
