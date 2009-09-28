@@ -20,9 +20,6 @@
 ;; (xwidget-set-keyboard-grab 3 1)
 
 
-(defun xwidget-dummy-hook ()
-  (message "xwidget dummy hook called"))
-
 ;;currently interface is lame:
 ;; :type 1=button, 2=toggle btn, 3=xembed socket(id will be printed to stdout)
 ;; obviously these should be symbols
@@ -30,11 +27,43 @@
 ;; :xwidget-id 1, MUST be unique and < 100 !
 ;; if slightly wrong, emacs WILL CRASH
 
+;; I will continue to hand-wave issues like these until the hard parts are solved.
 
-(defun xwidget-insert (where id type title width height)
-  (goto-char where)
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; api functions (tentative)
+;;  see xwidget.c for more api functions
+
+
+(defun xwidget-insert (pos id type title width height)
+ "insert an xwidget at POS, given ID, TYPE, TITLE WIDTH and HEIGHT.
+ID might be removed future-ish"
+  (goto-char pos)
   (put-text-property (point) (+ 1 (point)) 'display (list 'xwidget ':xwidget-id id ':type type ':title title ':width width ':height height))
   )
+
+
+(defun xwidget-resize-at (pos  width height)
+  "Resize xwidget at postion POS to WIDTH and HEIGHT.
+theres no corresponding resize-id fn yet, because of display property/xwidget id impedance mismatch.
+"
+  (let*
+      ((xwidget-prop (cdr (get-text-property pos 'display)))
+       (id (plist-get  xwidget-prop ':xwidget-id)))
+    (setq xwidget-prop (plist-put xwidget-prop ':width width))
+    (setq xwidget-prop (plist-put xwidget-prop  ':height height))
+          
+    (put-text-property pos (+ 1 pos) 'display (cons 'xwidget xwidget-prop))
+    (message "prop %s" xwidget-prop)
+    (message "id %d w %d  h %d" id width height)
+    (xwidget-resize id width height);; this is a badly named internal function!
+  ))
+
+
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+;; demo functions
+
 
 (defun xwidget-demo-basic ()
   (interactive)
@@ -91,7 +120,7 @@
                ((eq 3 xwidget-id)
                 (start-process "xembed" "*xembed*" (format "%ssrc/emacs" default-directory) "-q" "--parent-id" (number-to-string xembed-id) ) )
                ((eq 5 xwidget-id)
-                (start-process "xembed2" "*xembed2*" "/mnt/data/build/uzbl/uzbl"  "-s" (number-to-string xembed-id)  "http://www.fsf.org" )  )
+                (start-process "xembed2" "*xembed2*" "uzbl"  "-s" (number-to-string xembed-id)  "http://www.fsf.org" )  )
                
               )
             )))))
@@ -109,6 +138,9 @@
               (message "xembed ready  %S" xembed-id)
               )
             ))))
+(defun xwidget-dummy-hook ()
+  (message "xwidget dummy hook called"))
 
+;  (xwidget-resize-hack 1 200 200)
 
 ;(xwidget-demo-basic)

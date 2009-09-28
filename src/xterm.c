@@ -5760,8 +5760,10 @@ event_handler_gdk (gxev, ev, data)
      GdkEvent *ev;
      gpointer data;
 {
+
   XEvent *xev = (XEvent *) gxev;
 
+  
   if (current_count >= 0)
     {
       struct x_display_info *dpyinfo;
@@ -6313,10 +6315,23 @@ handle_one_xevent (dpyinfo, eventp, finish, hold_quit)
           /* Don't pass keys to GTK.  A Tab will shift focus to the
              tool bar in GTK 2.4.  Keys will still go to menus and
              dialogs because in that case popup_activated is TRUE
-             (see above).  */
-          if(!xwidget_owns_kbd)
+             (see above).
+          */
+          /* but try to let events escape to xwidgets  if xwidget_owns_kbd  */
+          if(!xwidget_owns_kbd){
+            //this is what emacs normally does here
             *finish = X_EVENT_DROP;
-          //FIXME for xwidget, the above line should be disabled when the child has focus
+            /*FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
+             *FINISH is zero if caller should continue reading events.
+             *FINISH is X_EVENT_DROP if event should not be passed to the toolkit.*/
+            
+            //FIXME for xwidget, the above line should be disabled when the child has focus JAVE TODO            
+          }else{
+            printf("xwidgets own events now!\n");
+            *finish = 0;
+            goto OTHER;
+          }
+
 #endif
 
           event.xkey.state

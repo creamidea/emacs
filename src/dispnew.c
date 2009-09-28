@@ -4382,6 +4382,7 @@ update_window (w, force_p)
   add_window_display_history (w, w->current_matrix->method, paused_p);
 #endif
 
+  
   if ((XWINDOW(FRAME_SELECTED_WINDOW (SELECTED_FRAME()))) ==  (w))
     xwidget_end_redisplay(w->current_matrix);
   
