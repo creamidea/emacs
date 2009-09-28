@@ -110,8 +110,6 @@ extern void xlwmenu_redisplay P_ ((Widget));
 #if defined (USE_X_TOOLKIT) || defined (USE_GTK)
 
 extern void free_frame_menubar P_ ((struct frame *));
-extern struct frame *x_menubar_window_to_frame P_ ((struct x_display_info *,
-						    int));
 #endif
 
 #ifdef USE_X_TOOLKIT
@@ -143,11 +141,6 @@ extern void _XEditResCheckMessages ();
 #endif /* USE_TOOLKIT_SCROLL_BARS */
 
 #endif /* USE_X_TOOLKIT */
-
-#if ! defined (USE_X_TOOLKIT) && ! defined (USE_GTK)
-#define x_any_window_to_frame x_window_to_frame
-#define x_top_window_to_frame x_window_to_frame
-#endif
 
 #ifdef USE_X_TOOLKIT
 #include "widget.h"
@@ -3915,7 +3908,14 @@ XTmouse_position (fp, insist, bar_window, part, x, y, time)
 
 		if (child == None || child == win)
 		  break;
-
+#ifdef USE_GTK
+		/* We don't wan't to know the innermost window.  We
+		   want the edit window.  For non-Gtk+ the innermost
+		   window is the edit window.  For Gtk+ it might not
+		   be.  It might be the tool bar for example.  */
+		if (x_window_to_frame (FRAME_X_DISPLAY_INFO (*fp), win))
+		  break;
+#endif
 		win = child;
 		parent_x = win_x;
 		parent_y = win_y;
@@ -3932,8 +3932,14 @@ XTmouse_position (fp, insist, bar_window, part, x, y, time)
 	       parent_{x,y} are invalid, but that's okay, because we'll
 	       never use them in that case.)  */
 
+#ifdef USE_GTK
+	    /* We don't wan't to know the innermost window.  We
+	       want the edit window.  */
+	    f1 = x_window_to_frame (FRAME_X_DISPLAY_INFO (*fp), win);
+#else
 	    /* Is win one of our frames?  */
 	    f1 = x_any_window_to_frame (FRAME_X_DISPLAY_INFO (*fp), win);
+#endif
 
 #ifdef USE_X_TOOLKIT
 	    /* If we end up with the menu bar window, say it's not
@@ -5754,8 +5760,10 @@ event_handler_gdk (gxev, ev, data)
      GdkEvent *ev;
      gpointer data;
 {
+
   XEvent *xev = (XEvent *) gxev;
 
+  
   if (current_count >= 0)
     {
       struct x_display_info *dpyinfo;
@@ -6307,10 +6315,23 @@ handle_one_xevent (dpyinfo, eventp, finish, hold_quit)
           /* Don't pass keys to GTK.  A Tab will shift focus to the
              tool bar in GTK 2.4.  Keys will still go to menus and
              dialogs because in that case popup_activated is TRUE
-             (see above).  */
-          if(!xwidget_owns_kbd)
+             (see above).
+          */
+          /* but try to let events escape to xwidgets  if xwidget_owns_kbd  */
+          if(!xwidget_owns_kbd){
+            //this is what emacs normally does here
             *finish = X_EVENT_DROP;
-          //FIXME for xwidget, the above line should be disabled when the child has focus
+            /*FINISH is X_EVENT_GOTO_OUT if caller should stop reading events.
+             *FINISH is zero if caller should continue reading events.
+             *FINISH is X_EVENT_DROP if event should not be passed to the toolkit.*/
+            
+            //FIXME for xwidget, the above line should be disabled when the child has focus JAVE TODO            
+          }else{
+            printf("xwidgets own events now!\n");
+            *finish = 0;
+            goto OTHER;
+          }
+
 #endif
 
           event.xkey.state
@@ -8663,7 +8684,7 @@ x_check_fullscreen (f)
     return;
 
   if (f->output_data.x->parent_desc != FRAME_X_DISPLAY_INFO (f)->root_window)
-    return; // Only fullscreen without WM or with EWM hints (above).
+    return; /* Only fullscreen without WM or with EWM hints (above). */
 
   if (f->want_fullscreen != FULLSCREEN_NONE)
     {

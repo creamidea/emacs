@@ -5,7 +5,7 @@
 
 ;; Author: Terrence Brannon (was: <brannon@rana.usc.edu>)
 ;; Created: December 16, 1996 - first release to usenet
-;; Keywords: gomoku, neural network, adaptive search, chemotaxis
+;; Keywords: games, gomoku, neural network, adaptive search, chemotaxis
 
 ;;;_* Usage
 ;;; Just type
@@ -876,7 +876,8 @@ If the game is finished, this command requests for another game."
 (defun lm-goto-xy (x y)
   "Move point to square at X, Y coords."
   (let ((inhibit-point-motion-hooks t))
-    (goto-line (+ 1 lm-y-offset (* lm-square-height (1- y)))))
+    (goto-char (point-min))
+    (forward-line (+ lm-y-offset (* lm-square-height (1- y)))))
   (move-to-column (+ lm-x-offset (* lm-square-width (1- x)))))
 
 (defun lm-plot-square (square value)

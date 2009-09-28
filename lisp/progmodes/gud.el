@@ -1,11 +1,11 @@
 ;;; gud.el --- Grand Unified Debugger mode for running GDB and other debuggers
 
+;; Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 2000, 2001, 2002, 2003,
+;;  2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
+
 ;; Author: Eric S. Raymond <esr@snark.thyrsus.com>
 ;; Maintainer: FSF
 ;; Keywords: unix, tools
-
-;; Copyright (C) 1992, 1993, 1994, 1995, 1996, 1998, 2000, 2001, 2002, 2003,
-;;  2004, 2005, 2006, 2007, 2008, 2009 Free Software Foundation, Inc.
 
 ;; This file is part of GNU Emacs.
 
@@ -133,14 +133,19 @@ Used to grey out relevant toolbar icons.")
 	   (and (eq gud-minor-mode 'gdbmi)
 		(> (car (window-fringes)) 0)))))
 
+(declare-function gdb-gud-context-command "gdb-mi.el")
+
 (defun gud-stop-subjob ()
   (interactive)
   (with-current-buffer gud-comint-buffer
-    (if (string-equal gud-target-name "emacs")
-	(comint-stop-subjob)
-      (if (eq gud-minor-mode 'jdb)
-	  (gud-call "suspend")
-	(comint-interrupt-subjob)))))
+    (cond ((string-equal gud-target-name "emacs")
+           (comint-stop-subjob))
+          ((eq gud-minor-mode 'jdb)
+           (gud-call "suspend"))
+          ((eq gud-minor-mode 'gdbmi)
+           (gud-call (gdb-gud-context-command "-exec-interrupt")))
+          (t 
+           (comint-interrupt-subjob)))))
 
 (easy-mmode-defmap gud-menu-map
   '(([help]     "Info (debugger)" . gud-goto-info)
@@ -156,12 +161,11 @@ Used to grey out relevant toolbar icons.")
                   :enable (not gud-running)
 		  :visible (memq gud-minor-mode '(gdbmi gdb dbx jdb)))
     ([go]	menu-item (if gdb-active-process "Continue" "Run") gud-go
-		  :visible (and (not gud-running)
-				(eq gud-minor-mode 'gdbmi)))
+		  :visible (and (eq gud-minor-mode 'gdbmi)
+                                (gdb-show-run-p)))
     ([stop]	menu-item "Stop" gud-stop-subjob
 		  :visible (or (not (memq gud-minor-mode '(gdbmi pdb)))
-			       (and gud-running
-				    (eq gud-minor-mode 'gdbmi))))
+			       (gdb-show-stop-p)))
     ([until]	menu-item "Continue to selection" gud-until
                   :enable (not gud-running)
 		  :visible (and (memq gud-minor-mode '(gdbmi gdb perldb))
@@ -248,11 +252,12 @@ Used to grey out relevant toolbar icons.")
 	:visible (memq gud-minor-mode '(gdbmi gdb dbx jdb)))
        ([menu-bar go] menu-item
 	,(propertize " go " 'face 'font-lock-doc-face) gud-go
-	:visible (and (not gud-running)
-		      (eq gud-minor-mode 'gdbmi)))
+	:visible (and (eq gud-minor-mode 'gdbmi)
+                      (gdb-show-run-p)))
        ([menu-bar stop] menu-item
 	,(propertize "stop" 'face 'font-lock-doc-face) gud-stop-subjob
-	:visible (or gud-running
+	:visible (or (and (eq gud-minor-mode 'gdbmi)
+                          (gdb-show-stop-p))
 		     (not (eq gud-minor-mode 'gdbmi))))
        ([menu-bar print]
 	. (,(propertize "print" 'face 'font-lock-doc-face) . gud-print))
@@ -2269,7 +2274,7 @@ gud, see `gud-mode'."
 
   ;; Set gud-jdb-classpath from the CLASSPATH environment variable,
   ;; if CLASSPATH is set.
-  (setq gud-jdb-classpath-string (getenv "CLASSPATH"))
+  (setq gud-jdb-classpath-string (or (getenv "CLASSPATH") "."))
   (if gud-jdb-classpath-string
       (setq gud-jdb-classpath
 	    (gud-jdb-parse-classpath-string gud-jdb-classpath-string)))
@@ -2710,7 +2715,8 @@ Obeying it means displaying in another window the specified file and line."
 		    (setq gud-keep-buffer t)))
 	    (save-restriction
 	      (widen)
-	      (goto-line line)
+	      (goto-char (point-min))
+	      (forward-line (1- line))
 	      (setq pos (point))
 	      (or gud-overlay-arrow-position
 		  (setq gud-overlay-arrow-position (make-marker)))

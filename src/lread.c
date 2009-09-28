@@ -80,6 +80,14 @@ along with GNU Emacs.  If not, see <http://www.gnu.org/licenses/>.  */
 extern int errno;
 #endif
 
+/* hash table read constants */
+Lisp_Object Qhash_table, Qdata;
+Lisp_Object Qtest, Qsize;
+Lisp_Object Qweakness;
+Lisp_Object Qrehash_size;
+Lisp_Object Qrehash_threshold;
+extern Lisp_Object QCtest, QCsize, QCrehash_size, QCrehash_threshold, QCweakness;
+
 Lisp_Object Qread_char, Qget_file_char, Qstandard_input, Qcurrent_load_list;
 Lisp_Object Qvariable_documentation, Vvalues, Vstandard_input, Vafter_load_alist;
 Lisp_Object Qascii_character, Qload, Qload_file_name;
@@ -2250,7 +2258,8 @@ read_integer (readcharfun, radix)
      int radix;
 {
   int ndigits = 0, invalid_p, c, sign = 0;
-  EMACS_INT number = 0;
+  /* We use a floating point number because  */
+  double number = 0;
 
   if (radix < 2 || radix > 36)
     invalid_p = 1;
@@ -2300,7 +2309,7 @@ read_integer (readcharfun, radix)
       invalid_syntax (buf, 0);
     }
 
-  return make_number (sign * number);
+  return make_fixnum_or_float (sign * number);
 }
 
 
@@ -2346,6 +2355,77 @@ read1 (readcharfun, pch, first_in_list)
 
     case '#':
       c = READCHAR;
+      if (c == 's')
+	{
+	  c = READCHAR;
+	  if (c == '(')
+	    {
+	      /* Accept extended format for hashtables (extensible to
+		 other types), e.g.
+		 #s(hash-table size 2 test equal data (k1 v1 k2 v2)) */
+	      Lisp_Object tmp = read_list (0, readcharfun);
+	      Lisp_Object head = CAR_SAFE (tmp);
+	      Lisp_Object data = Qnil;
+	      Lisp_Object val = Qnil;
+	      /* The size is 2 * number of allowed keywords to
+		 make-hash-table. */
+	      Lisp_Object params[10]; 
+	      Lisp_Object ht;
+	      Lisp_Object key = Qnil;
+	      int param_count = 0;
+	      
+	      if (!EQ (head, Qhash_table))
+		error ("Invalid extended read marker at head of #s list "
+		       "(only hash-table allowed)");
+	      
+	      tmp = CDR_SAFE (tmp);
+
+	      /* This is repetitive but fast and simple. */
+	      params[param_count] = QCsize;
+	      params[param_count+1] = Fplist_get (tmp, Qsize);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      params[param_count] = QCtest;
+	      params[param_count+1] = Fplist_get (tmp, Qtest);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      params[param_count] = QCweakness;
+	      params[param_count+1] = Fplist_get (tmp, Qweakness);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      params[param_count] = QCrehash_size;
+	      params[param_count+1] = Fplist_get (tmp, Qrehash_size);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      params[param_count] = QCrehash_threshold;
+	      params[param_count+1] = Fplist_get (tmp, Qrehash_threshold);
+	      if (!NILP (params[param_count+1]))
+		param_count+=2;
+
+	      /* This is the hashtable data. */
+	      data = Fplist_get (tmp, Qdata);
+
+	      /* Now use params to make a new hashtable and fill it. */
+	      ht = Fmake_hash_table (param_count, params);
+	      
+	      while (CONSP (data))
+	      	{
+	      	  key = XCAR (data);
+	      	  data = XCDR (data);
+	      	  if (!CONSP (data))
+	      	    error ("Odd number of elements in hashtable data");
+	      	  val = XCAR (data);
+	      	  data = XCDR (data);
+	      	  Fputhash (key, val, ht);
+	      	}
+	      
+	      return ht;
+	    }
+	}
       if (c == '^')
 	{
 	  c = READCHAR;
@@ -2922,7 +3002,6 @@ read1 (readcharfun, pch, first_in_list)
 	if (!quoted && !uninterned_symbol)
 	  {
 	    register char *p1;
-	    register Lisp_Object val;
 	    p1 = read_buffer;
 	    if (*p1 == '+' || *p1 == '-') p1++;
 	    /* Is it an integer? */
@@ -2936,15 +3015,21 @@ read1 (readcharfun, pch, first_in_list)
 		  {
 		    if (p1[-1] == '.')
 		      p1[-1] = '\0';
-		    /* Fixme: if we have strtol, use that, and check
-		       for overflow.  */
-		    if (sizeof (int) == sizeof (EMACS_INT))
-		      XSETINT (val, atoi (read_buffer));
-		    else if (sizeof (long) == sizeof (EMACS_INT))
-		      XSETINT (val, atol (read_buffer));
-		    else
-		      abort ();
-		    return val;
+		    {
+		      /* EMACS_INT n = atol (read_buffer); */
+		      char *endptr = NULL;
+		      EMACS_INT n = (errno = 0,
+				     strtol (read_buffer, &endptr, 10));
+		      if (errno == ERANGE && endptr)
+			{
+			  Lisp_Object args
+			    = Fcons (make_string (read_buffer,
+						  endptr - read_buffer),
+				     Qnil);
+			  xsignal (Qoverflow_error, args);
+			}
+		      return make_fixnum_or_float (n);
+		    }
 		  }
 	      }
 	    if (isfloat_string (read_buffer))
@@ -4448,6 +4533,21 @@ to load.  See also `load-dangerous-libraries'.  */);
 
   Vloads_in_progress = Qnil;
   staticpro (&Vloads_in_progress);
+
+  Qhash_table = intern ("hash-table");
+  staticpro (&Qhash_table);
+  Qdata = intern ("data");
+  staticpro (&Qdata);
+  Qtest = intern ("test");
+  staticpro (&Qtest);
+  Qsize = intern ("size");
+  staticpro (&Qsize);
+  Qweakness = intern ("weakness");
+  staticpro (&Qweakness);
+  Qrehash_size = intern ("rehash-size");
+  staticpro (&Qrehash_size);
+  Qrehash_threshold = intern ("rehash-threshold");
+  staticpro (&Qrehash_threshold);
 }
 
 /* arch-tag: a0d02733-0f96-4844-a659-9fd53c4f414d

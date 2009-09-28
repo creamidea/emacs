@@ -183,6 +183,12 @@ update-elclist:
 	  chmod +w $(lisp)/Makefile.in; \
 	  mv -f temp-elcfiles $(lisp)/Makefile.in; \
 	fi
+	-(COLLATE=C ls $(lisp)/*.elc $(lisp)/*/*.elc | sed 's/elc$$/el/';  \
+	  COLLATE=C ls $(lisp)/*.el  $(lisp)/*/*.el;   			   \
+	  COLLATE=C ls $(lisp)/*.el  $(lisp)/*/*.el) | 			   \
+	     sort | uniq -u | while read extra; do 			   \
+	         echo "Found left over byte-compiled file: $${extra}c !!" ;\
+	     done
 
 ## Explicitly list the .elc files, for the sake of parallel builds.
 ## http://lists.gnu.org/archive/html/bug-gnu-emacs/2008-05/msg00016.html
@@ -500,6 +506,7 @@ ELCFILES = \
 	$(lisp)/ffap.elc \
 	$(lisp)/filecache.elc \
 	$(lisp)/files.elc \
+	$(lisp)/files-x.elc \
 	$(lisp)/filesets.elc \
 	$(lisp)/find-cmd.elc \
 	$(lisp)/find-dired.elc \
@@ -700,6 +707,7 @@ ELCFILES = \
 	$(lisp)/international/robin.elc \
 	$(lisp)/international/titdic-cnv.elc \
 	$(lisp)/international/utf-7.elc \
+	$(lisp)/international/ucs-normalize.elc \
 	$(lisp)/isearch.elc \
 	$(lisp)/isearchb.elc \
 	$(lisp)/iswitchb.elc \
@@ -911,22 +919,30 @@ ELCFILES = \
 	$(lisp)/obsolete/x-menu.elc \
 	$(lisp)/org/org-agenda.elc \
 	$(lisp)/org/org-archive.elc \
+	$(lisp)/org/org-ascii.elc \
 	$(lisp)/org/org-attach.elc \
 	$(lisp)/org/org-bbdb.elc \
 	$(lisp)/org/org-bibtex.elc \
 	$(lisp)/org/org-clock.elc \
 	$(lisp)/org/org-colview.elc \
 	$(lisp)/org/org-compat.elc \
+	$(lisp)/org/org-docbook.elc \
+	$(lisp)/org/org-exp-blocks.elc \
 	$(lisp)/org/org-exp.elc \
-	$(lisp)/org/org-export-latex.elc \
 	$(lisp)/org/org-faces.elc \
+	$(lisp)/org/org-feed.elc \
 	$(lisp)/org/org-footnote.elc \
 	$(lisp)/org/org-gnus.elc \
+	$(lisp)/org/org-html.elc \
+	$(lisp)/org/org-icalendar.elc \
 	$(lisp)/org/org-id.elc \
+	$(lisp)/org/org-indent.elc \
 	$(lisp)/org/org-info.elc \
+	$(lisp)/org/org-inlinetask.elc \
 	$(lisp)/org/org-install.elc \
 	$(lisp)/org/org-irc.elc \
 	$(lisp)/org/org-jsinfo.elc \
+	$(lisp)/org/org-latex.elc \
 	$(lisp)/org/org-list.elc \
 	$(lisp)/org/org-mac-message.elc \
 	$(lisp)/org/org-macs.elc \
@@ -934,14 +950,17 @@ ELCFILES = \
 	$(lisp)/org/org-mhe.elc \
 	$(lisp)/org/org-mouse.elc \
 	$(lisp)/org/org-plot.elc \
+	$(lisp)/org/org-protocol.elc \
 	$(lisp)/org/org-publish.elc \
 	$(lisp)/org/org-remember.elc \
 	$(lisp)/org/org-rmail.elc \
+	$(lisp)/org/org-src.elc \
 	$(lisp)/org/org-table.elc \
 	$(lisp)/org/org-timer.elc \
 	$(lisp)/org/org-vm.elc \
 	$(lisp)/org/org-w3m.elc \
 	$(lisp)/org/org-wl.elc \
+	$(lisp)/org/org-xoxo.elc \
 	$(lisp)/org/org.elc \
 	$(lisp)/outline.elc \
 	$(lisp)/paren.elc \
@@ -1051,7 +1070,7 @@ ELCFILES = \
 	$(lisp)/progmodes/idlw-toolbar.elc \
 	$(lisp)/progmodes/idlwave.elc \
 	$(lisp)/progmodes/inf-lisp.elc \
-	$(lisp)/progmodes/js2-mode.elc \
+	$(lisp)/progmodes/js.elc \
 	$(lisp)/progmodes/ld-script.elc \
 	$(lisp)/progmodes/m4-mode.elc \
 	$(lisp)/progmodes/make-mode.elc \

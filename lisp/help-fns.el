@@ -158,10 +158,6 @@ KIND should be `var' for a variable or `subr' for a subroutine."
 	    (concat "src/" file)
 	  file)))))
 
-(defface help-argument-name '((((supports :slant italic)) :inherit italic))
-  "Face to highlight argument names in *Help* buffers."
-  :group 'help)
-
 (defun help-default-arg-highlight (arg)
   "Default function to highlight arguments in *Help* buffers.
 It returns ARG in face `help-argument-name'; ARG is also
@@ -719,7 +715,12 @@ it is displayed along with the global value."
 				     (not (file-remote-p (buffer-file-name)))
 				     (dir-locals-find-file (buffer-file-name)))))
 		      (princ "  This variable is a directory local variable")
-		      (if file (princ (concat "\n  from the file \"" file "\"")))
+		      (when file
+			(princ (concat "\n  from the file \""
+				       (if (consp file)
+					   (car file)
+					 file)
+				       "\"")))
 		      (princ ".\n"))
 		  (princ "  This variable is a file local variable.\n")))
 

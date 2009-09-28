@@ -516,8 +516,8 @@ in place of `..':
   eol-type of `process-coding-system' for read (of the current buffer, if any)
   `process-coding-system' for write (of the current buffer, if any)
   eol-type of `process-coding-system' for write (of the current buffer, if any)
-  `default-buffer-file-coding-system'
-  eol-type of `default-buffer-file-coding-system'
+  default `buffer-file-coding-system'
+  eol-type of default `buffer-file-coding-system'
   `default-process-coding-system' for read
   eol-type of `default-process-coding-system' for read
   `default-process-coding-system' for write
@@ -537,8 +537,9 @@ in place of `..':
      (coding-system-eol-type-mnemonic (car process-coding-systems))
      (coding-system-mnemonic (cdr process-coding-systems))
      (coding-system-eol-type-mnemonic (cdr process-coding-systems))
-     (coding-system-mnemonic default-buffer-file-coding-system)
-     (coding-system-eol-type-mnemonic default-buffer-file-coding-system)
+     (coding-system-mnemonic (default-value 'buffer-file-coding-system))
+     (coding-system-eol-type-mnemonic
+      (default-value 'buffer-file-coding-system))
      (coding-system-mnemonic (car default-process-coding-system))
      (coding-system-eol-type-mnemonic (car default-process-coding-system))
      (coding-system-mnemonic (cdr default-process-coding-system))
@@ -592,7 +593,7 @@ docstring, and print only the first line of the docstring."
 	  (print-coding-system-briefly buffer-file-coding-system)
 	(princ "Not set locally, use the default.\n"))
       (princ "Default coding system (for new files):\n  ")
-      (print-coding-system-briefly default-buffer-file-coding-system)
+      (print-coding-system-briefly (default-value 'buffer-file-coding-system))
       (princ "Coding system for keyboard input:\n  ")
       (print-coding-system-briefly (keyboard-coding-system))
       (princ "Coding system for terminal output:\n  ")
@@ -1087,7 +1088,8 @@ system which uses fontsets)."
       (insert "Version of this emacs:\n  " (emacs-version) "\n\n")
       (insert "Configuration options:\n  " system-configuration-options "\n\n")
       (insert "Multibyte characters awareness:\n"
-	      (format "  default: %S\n" default-enable-multibyte-characters)
+	      (format "  default: %S\n" (default-value
+					  'enable-multibyte-characters))
 	      (format "  current-buffer: %S\n\n" enable-multibyte-characters))
       (insert "Current language environment: " current-language-environment
 	      "\n\n")
@@ -1130,7 +1132,7 @@ system which uses fontsets)."
 	(insert "------------\t\t\t\t\t\t  ----- -----\n")
 	(dolist (fontset (fontset-list))
 	  (print-fontset fontset t)))
-      (print-help-return-message))))
+      (help-print-return-message))))
 
 ;;;###autoload
 (defun font-show-log (&optional limit)

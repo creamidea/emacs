@@ -5201,6 +5201,16 @@ pop_it (it)
     case GET_FROM_STRING:
       it->object = it->string;
       break;
+    case GET_FROM_DISPLAY_VECTOR:
+      if (it->s)
+	it->method = GET_FROM_C_STRING;
+      else if (STRINGP (it->string))
+	it->method = GET_FROM_STRING;
+      else
+	{
+	  it->method = GET_FROM_BUFFER;
+	  it->object = it->w->buffer;
+	}
     }
   it->end_charpos = p->end_charpos;
   it->string_nchars = p->string_nchars;
@@ -11700,29 +11710,17 @@ redisplay_internal (preserve_echo_area)
  		    = MATRIX_ROW (w->current_matrix, this_line_vpos + 1);
   		  int delta, delta_bytes;
 
-  		  if (Z - CHARPOS (tlendpos) == ZV)
-		    {
-		      /* This line ends at end of (accessible part of)
-			 buffer.  There is no newline to count.  */
-		      delta = (Z
-			       - CHARPOS (tlendpos)
-			       - MATRIX_ROW_START_CHARPOS (row));
-		      delta_bytes = (Z_BYTE
-				     - BYTEPOS (tlendpos)
-				     - MATRIX_ROW_START_BYTEPOS (row));
-		    }
-  		  else
-		    {
-		      /* This line ends in a newline.  Must take
-			 account of the newline and the rest of the
-			 text that follows.  */
-		      delta = (Z
-			       - CHARPOS (tlendpos)
-			       - MATRIX_ROW_START_CHARPOS (row));
-		      delta_bytes = (Z_BYTE
-				     - BYTEPOS (tlendpos)
-				     - MATRIX_ROW_START_BYTEPOS (row));
-		    }
+		  /* We used to distinguish between two cases here,
+		     conditioned by Z - CHARPOS (tlendpos) == ZV, for
+		     when the line ends in a newline or the end of the
+		     buffer's accessible portion.  But both cases did
+		     the same, so they were collapsed.  */
+		  delta = (Z
+			   - CHARPOS (tlendpos)
+			   - MATRIX_ROW_START_CHARPOS (row));
+		  delta_bytes = (Z_BYTE
+				 - BYTEPOS (tlendpos)
+				 - MATRIX_ROW_START_BYTEPOS (row));
 
   		  increment_matrix_positions (w->current_matrix,
 					      this_line_vpos + 1,

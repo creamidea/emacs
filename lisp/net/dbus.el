@@ -34,6 +34,7 @@
 ;; option "--without-dbus".  Declare used subroutines and variables.
 (declare-function dbus-call-method "dbusbind.c")
 (declare-function dbus-call-method-asynchronously "dbusbind.c")
+(declare-function dbus-init-bus "dbusbind.c")
 (declare-function dbus-method-return-internal "dbusbind.c")
 (declare-function dbus-method-error-internal "dbusbind.c")
 (declare-function dbus-register-signal "dbusbind.c")
@@ -492,13 +493,26 @@ The result is either a string, or `nil' if there is no name owner."
      bus dbus-service-dbus dbus-path-dbus
      dbus-interface-dbus "GetNameOwner" service)))
 
-(defun dbus-ping (bus service)
-  "Check whether SERVICE is registered for D-Bus BUS."
+(defun dbus-ping (bus service &optional timeout)
+  "Check whether SERVICE is registered for D-Bus BUS.
+TIMEOUT, a nonnegative integer, specifies the maximum number of
+milliseconds `dbus-ping' must return.  The default value is 25,000.
+
+Note, that this autoloads SERVICE if it is not running yet.  If
+it shall be checked whether SERVICE is already running, one shall
+apply
+
+  \(member service \(dbus-list-known-names bus))"
   ;; "Ping" raises a D-Bus error if SERVICE does not exist.
   ;; Otherwise, it returns silently with `nil'.
   (condition-case nil
       (not
-       (dbus-call-method bus service dbus-path-dbus dbus-interface-peer "Ping"))
+       (if (natnump timeout)
+	   (dbus-call-method
+	    bus service dbus-path-dbus dbus-interface-peer
+	    "Ping" :timeout timeout)
+	 (dbus-call-method
+	  bus service dbus-path-dbus dbus-interface-peer "Ping")))
     (dbus-error nil)))
 
 
@@ -830,6 +844,14 @@ name of the property, and its value.  If there are no properties,
 	 'result
 	 (cons property (dbus-get-property bus service path interface property))
 	 'append)))))
+
+;; Initialize :system and :session buses.  This adds their file
+;; descriptors to input_wait_mask, in order to detect incoming
+;; messages immediately.
+(when (featurep 'dbusbind)
+  (dbus-ignore-errors
+    (dbus-init-bus :system)
+    (dbus-init-bus :session)))
 
 (provide 'dbus)
 

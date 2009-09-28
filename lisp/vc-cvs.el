@@ -225,7 +225,8 @@ See also variable `vc-cvs-sticky-date-format-string'."
 	  state))
     (with-temp-buffer
       (cd (file-name-directory file))
-      (vc-cvs-command t 0 file "status")
+      (let (process-file-side-effects)
+	(vc-cvs-command t 0 file "status"))
       (vc-cvs-parse-status t))))
 
 (defun vc-cvs-state-heuristic (file)
@@ -458,7 +459,8 @@ The changes are between FIRST-REVISION and SECOND-REVISION."
           (if (re-search-forward
                (concat "^\\([CMUP] \\)?"
                        (regexp-quote
-                        (substring file (length default-directory)))
+                        (substring file (length (expand-file-name
+                                                 "." default-directory))))
                        "\\( already contains the differences between \\)?")
                nil t)
               (cond
@@ -492,13 +494,18 @@ Will fail unless you have administrative privileges on the repo."
 ;;; History functions
 ;;;
 
+(declare-function vc-rcs-print-log-cleanup "vc-rcs" ())
+
 (defun vc-cvs-print-log (files &optional buffer)
   "Get change logs associated with FILES."
+  (require 'vc-rcs)
   ;; It's just the catenation of the individual logs.
   (vc-cvs-command
    buffer
    (if (vc-stay-local-p files 'CVS) 'async 0)
-   files "log"))
+   files "log")
+  (with-current-buffer buffer
+    (vc-exec-after (vc-rcs-print-log-cleanup))))
 
 (defun vc-cvs-comment-history (file)
   "Get comment history of a file."
@@ -506,7 +513,8 @@ Will fail unless you have administrative privileges on the repo."
 
 (defun vc-cvs-diff (files &optional oldvers newvers buffer)
   "Get a difference report using CVS between two revisions of FILE."
-  (let* ((async (and (not vc-disable-async-diff)
+  (let* (process-file-side-effects
+	 (async (and (not vc-disable-async-diff)
 		     (vc-stay-local-p files 'CVS)))
 	 (invoke-cvs-diff-list nil)
 	 status)
@@ -629,6 +637,16 @@ systime, or nil if there is none."
 			   (line-end-position) t)
 	(match-string-no-properties 1)
       nil)))
+
+(defun vc-cvs-previous-revision (file rev)
+  (vc-call-backend 'RCS 'previous-revision file rev))
+
+(defun vc-cvs-next-revision (file rev)
+  (vc-call-backend 'RCS 'next-revision file rev))
+
+;; FIXME: This should probably be replaced by code using cvs2cl.
+(defun vc-cvs-update-changelog (files)
+  (vc-call-backend 'RCS 'update-changelog files))
 
 ;;;
 ;;; Tag system
@@ -1165,7 +1183,8 @@ is non-nil."
 ;; tag names.
 
 (defun vc-cvs-revision-table (file)
-  (let ((default-directory (file-name-directory file))
+  (let (process-file-side-effects
+	(default-directory (file-name-directory file))
         (res nil))
     (with-temp-buffer
       (vc-cvs-command t nil file "log")

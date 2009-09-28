@@ -166,9 +166,16 @@ ns_descriptor_to_entity (NSFontDescriptor *desc, Lisp_Object extra, char *style)
     Lisp_Object font_entity = font_make_entity ();
     /*   NSString *psName = [desc postscriptName]; */
     NSString *family = [desc objectForKey: NSFontFamilyAttribute];
-    char *escapedFamily = strdup ([family UTF8String]);
     unsigned int traits = [desc symbolicTraits];
+    char *escapedFamily;
 
+    /* Shouldn't happen, but on Tiger fallback desc gets name but no family. */
+    if (family == nil)
+      family = [desc objectForKey: NSFontNameAttribute];
+    if (family == nil)
+      family = [[NSFont userFixedPitchFontOfSize: 0] familyName];
+
+    escapedFamily = strdup ([family UTF8String]);
     ns_escape_name (escapedFamily);
 
     ASET (font_entity, FONT_TYPE_INDEX, Qns);
@@ -464,7 +471,7 @@ ns_findfonts (Lisp_Object font_spec, BOOL isMatch)
     /* If has non-unicode registry, give up. */
     tem = AREF (font_spec, FONT_REGISTRY_INDEX);
     if (! NILP (tem) && !EQ (tem, Qiso10646_1) && !EQ (tem, Qunicode_bmp))
-	return isMatch ? Fcons (ns_fallback_entity (), list) : Qnil;
+	return isMatch ? ns_fallback_entity () : Qnil;
 
     cFamilies = ns_get_covering_families (ns_get_req_script (font_spec), 0.90);
 
@@ -483,9 +490,12 @@ ns_findfonts (Lisp_Object font_spec, BOOL isMatch)
 	if (![cFamilies containsObject:
 	         [desc objectForKey: NSFontFamilyAttribute]])
 	    continue;
-	list = Fcons (ns_descriptor_to_entity (desc,
+        tem = ns_descriptor_to_entity (desc,
 					 AREF (font_spec, FONT_EXTRA_INDEX),
-					 NULL), list);
+                                       NULL);
+        if (isMatch)
+          return tem;
+	list = Fcons (tem, list);
 	if (fabs (ns_attribute_fvalue (desc, NSFontSlantTrait)) > 0.05)
 	    foundItal = YES;
       }
@@ -503,8 +513,8 @@ ns_findfonts (Lisp_Object font_spec, BOOL isMatch)
       }
 
     /* Return something if was a match and nothing found. */
-    if (isMatch && XINT (Flength (list)) == 0)
-      list = Fcons (ns_fallback_entity (), Qnil);
+    if (isMatch)
+      return ns_fallback_entity ();
 
     if (NSFONT_TRACE)
 	fprintf (stderr, "    Returning %d entities.\n", XINT (Flength (list)));
@@ -666,6 +676,8 @@ nsfont_open (FRAME_PTR f, Lisp_Object font_entity, int pixel_size)
   synthItal = !NILP (tem) && !strncmp ("synthItal", SDATA (SYMBOL_NAME (tem)),
                                        9);
   family = ns_get_family (font_entity);
+  if (family == nil)
+    family = [[NSFont userFixedPitchFontOfSize: 0] familyName];
   /* Should be > 0.23 as some font descriptors (e.g. Terminus) set to that
      when setting family in ns_spec_to_descriptor(). */
   if (ns_attribute_fvalue (fontDesc, NSFontWeightTrait) > 0.50)

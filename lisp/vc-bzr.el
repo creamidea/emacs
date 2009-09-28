@@ -134,7 +134,8 @@ Invoke the bzr command adding `BZR_PROGRESS_BAR=none' and
   (with-temp-buffer
     (set-buffer-multibyte nil)
     (let ((prog sha1-program)
-          (args nil))
+          (args nil)
+	  process-file-side-effects)
       (when (consp prog)
 	(setq args (cdr prog))
         (setq prog (car prog)))
@@ -593,14 +594,6 @@ stream.  Standard error output is discarded."
      (apply #'process-file command nil (list (current-buffer) nil) nil args)
      (buffer-substring (point-min) (point-max)))))
 
-(defun vc-bzr-prettify-state-info (file)
-  "Bzr-specific version of `vc-prettify-state-info'."
-  (if (eq 'edited (vc-state file))
-        (concat "(" (symbol-name (or (vc-file-getprop file 'vc-bzr-state)
-                                     'edited)) ")")
-    ;; else fall back to default vc.el representation
-    (vc-default-prettify-state-info 'Bzr file)))
-
 (defstruct (vc-bzr-extra-fileinfo
             (:copier nil)
             (:constructor vc-bzr-create-extra-fileinfo (extra-name))
@@ -751,7 +744,8 @@ stream.  Standard error output is discarded."
        ((string-match "\\`\\(tag\\):" string)
         (let ((prefix (substring string 0 (match-end 0)))
               (tag (substring string (match-end 0)))
-              (table nil))
+              (table nil)
+	      process-file-side-effects)
           (with-temp-buffer
             ;; "bzr-1.2 tags" is much faster with --show-ids.
             (process-file vc-bzr-program nil '(t) nil "tags" "--show-ids")
